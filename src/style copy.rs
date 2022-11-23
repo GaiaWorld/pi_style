@@ -17,79 +17,17 @@ use smallvec::SmallVec;
 use pi_atom::Atom;
 use pi_flex_layout::prelude::{INode, Number, Rect, Size as FlexSize};
 
+pub type Matrix4 = nalgebra::Matrix4<f32>;
 pub type Point2 = nalgebra::Point2<f32>;
-
-
-pub type Aabb2 = ncollide2d::bounding_volume::AABB<f32>;
-#[derive(Debug, Deref, DerefMut, Clone, Serialize, Deserialize, Hash)]
-pub struct NotNanRect(pub Rect<NotNan<f32>>);
-
-impl Default for NotNanRect {
-    fn default() -> Self {
-        Self(unsafe {
-            Rect {
-                top: NotNan::new_unchecked(0.0),
-                right: NotNan::new_unchecked(1.0),
-                bottom: NotNan::new_unchecked(1.0),
-                left: NotNan::new_unchecked(0.0),
-            }
-        })
-    }
-}
-
-impl NotNanRect {
-    pub fn new(top: NotNan<f32>, right: NotNan<f32>, bottom: NotNan<f32>, left: NotNan<f32>) -> Self { Self(Rect { top, right, bottom, left }) }
-
-    /// 是否为单位rect（0~1）
-    pub fn is_unit(&self) -> bool {
-        if *self.left == 0.0 && *self.top == 0.0 && *self.right == 1.0 && *self.bottom == 1.0 {
-            true
-        } else {
-            false
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum BaseShape {
-	Circle {
-		radius: LengthUnit,
-		center: Center,
-	},
-	Ellipse {
-		rx: LengthUnit,
-		ry: LengthUnit,
-		center: Center,
-	},
-	Inset {
-		rect_box: [LengthUnit;4],
-		border_radius: BorderRadius,
-	},
-	Sector {
-		rotate: f32, // 旋转 （单位： 弧度）
-		angle: f32, // 弧度角
-		radius: LengthUnit, // 半径
-		center: Center
-	}
-}
-
-impl Default for BaseShape {
-    fn default() -> Self {
-        BaseShape::Circle {
-			radius: Default::default(),
-			center: Default::default(),
-		}
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct Center {
-	pub x: LengthUnit,
-	pub y: LengthUnit
-}
-
+pub type Point3 = nalgebra::Point3<f32>;
+pub type Vector2 = nalgebra::Vector2<f32>;
+pub type Vector3 = nalgebra::Vector3<f32>;
+pub type Vector4 = nalgebra::Vector4<f32>;
 #[derive(Debug, Deref, DerefMut, Clone, Serialize, Deserialize)]
 pub struct CgColor(nalgebra::Vector4<f32>);
+pub type Aabb2 = ncollide2d::bounding_volume::AABB<f32>;
+pub type NotNanRect = Rect<NotNan<f32>>;
+
 impl Hash for CgColor {
     fn hash<H: Hasher>(&self, state: &mut H) {
         unsafe {
@@ -115,7 +53,7 @@ pub struct Node;
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct Animation {
-    pub name: AnimationName,                               // 指定要绑定到选择器的关键帧的名称
+    pub name: SmallVec<[Atom; 1]>,                               // 指定要绑定到选择器的关键帧的名称
     pub duration: SmallVec<[Time; 1]>,                           // 动画指定需要多少毫秒完成
     pub timing_function: SmallVec<[AnimationTimingFunction; 1]>, // 设置动画将如何完成一个周期(插值函数)
     pub iteration_count: SmallVec<[IterationCount; 1]>,
@@ -123,12 +61,6 @@ pub struct Animation {
     pub direction: SmallVec<[AnimationDirection; 1]>,  // 指定是否应该轮流反向播放动画。
     pub fill_mode: SmallVec<[AnimationFillMode; 1]>,   // 规定当动画不播放时（当动画完成时，或当动画有一个延迟未开始播放时），要应用到元素的样式。
     pub play_state: SmallVec<[AnimationPlayState; 1]>, // 指定动画是否正在运行或已暂停
-}
-
-#[derive(Debug, Default, Serialize, Clone, Deserialize)]
-pub struct AnimationName {
-	pub value: SmallVec<[Atom; 1]>,
-	pub scope_hash: usize,
 }
 
 impl Animation {
@@ -210,7 +142,7 @@ pub enum EaseFunction {
 pub enum AnimationTimingFunction {
     /// 匀速
     Linear,
-    /// 淡入淡出
+	/// 淡入淡出
     Ease(EEasingMode),
     /// 跳跃
     Step(usize, EStepMode),
@@ -367,8 +299,12 @@ pub enum MaskImage {
 }
 
 
-#[derive(Debug, Deref, DerefMut, Clone, Serialize, Deserialize, Default)]
-pub struct MaskImageClip(pub NotNanRect);
+#[derive(Debug, Deref, DerefMut, Clone, Serialize, Deserialize)]
+pub struct MaskImageClip(pub Aabb2);
+
+impl Default for MaskImageClip {
+    fn default() -> Self { MaskImageClip(Aabb2::new(Point2::new(0.0, 0.0), Point2::new(1.0, 1.0))) }
+}
 
 // 滤镜， 与CSS的Filter不同， 该滤镜不依赖Filter 函数的先后顺序， 且同种滤镜设置多次，会覆盖前面的设置（css是一种叠加效果）
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -382,24 +318,34 @@ pub struct Hsi {
 pub struct Blur(pub f32);
 
 //ObjectFit
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct BackgroundImageMod {
     pub object_fit: FitType,
     pub repeat: ImageRepeat,
 }
 
 // image图像的uv（仅支持百分比， 不支持像素值）
-#[derive(Debug, Deref, DerefMut, Clone, Serialize, Deserialize, Hash, Default)]
-pub struct BackgroundImageClip(pub NotNanRect);
-
+#[derive(Debug, Deref, DerefMut, Clone, Serialize, Deserialize)]
+pub struct BackgroundImageClip(pub Aabb2);
 
 // 边框图片
 #[derive(Debug, Deref, DerefMut, Clone, Serialize, Deserialize, Default, Hash)]
 pub struct BorderImage(pub Atom);
 
 // borderImage图像的uv（仅支持百分比， 不支持像素值）
-#[derive(Debug, Deref, DerefMut, Clone, Serialize, Deserialize, Hash, Default)]
+#[derive(Debug, Deref, DerefMut, Clone, Serialize, Deserialize, Hash)]
 pub struct BorderImageClip(pub NotNanRect);
+
+impl Default for BorderImageClip {
+    fn default() -> Self {
+        Self(NotNanRect {
+            left: unsafe { NotNan::new_unchecked(0.0) },
+            top: unsafe { NotNan::new_unchecked(0.0) },
+            right: unsafe { NotNan::new_unchecked(1.0) },
+            bottom: unsafe { NotNan::new_unchecked(1.0) },
+        })
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
 pub struct BorderImageSlice {
@@ -434,8 +380,8 @@ pub struct ImageRepeat {
 // 圆角， 目前仅支持x分量
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct BorderRadius {
-    pub x: [LengthUnit; 4],
-	pub y: [LengthUnit; 4],
+    pub x: LengthUnit,
+    pub y: LengthUnit,
 }
 
 // 参考CSS的box-shadow的语法
@@ -506,7 +452,8 @@ impl Default for TextStyle {
     }
 }
 
-pub type TextShadows = SmallVec<[TextShadow; 1]>;
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Deref, DerefMut)]
+pub struct TextShadows(pub SmallVec<[TextShadow; 1]>);
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TextShadow {
@@ -516,14 +463,36 @@ pub struct TextShadow {
     pub color: CgColor, //	可选。阴影的颜色。参阅 CSS 颜色值。
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Font {
+    pub style: FontStyle, //	规定字体样式。参阅：font-style 中可能的值。
+    pub weight: usize,    //	规定字体粗细。参阅：font-weight 中可能的值。
+    pub size: FontSize,   //
+    pub family: usize,    //	规定字体系列。参阅：font-family 中可能的值。
+}
+
 // TransformWillChange， 用于优化频繁变化的Transform
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
-pub struct TransformWillChange(pub TransformFuncs);
+pub struct TransformWillChange(pub Transform);
 
+impl Default for Font {
+    fn default() -> Self {
+        Self {
+            style: FontStyle::default(),
+            weight: 500,
+            size: FontSize::default(),
+            family: 0,
+        }
+    }
+}
 
 // #[derive(Debug)]
 // pub struct Quad(pub Point2, pub Point2, pub Point2, pub Point2);
 
+pub enum LengthUnitType {
+    Pixel,
+    Percent,
+}
 #[derive(Clone, Copy, Debug, EnumDefault, Serialize, Deserialize)]
 pub enum LengthUnit {
     Pixel(f32),
@@ -542,21 +511,6 @@ pub enum Color {
     RGBA(CgColor),
     LinearGradient(LinearGradientColor),
     // RadialGradient(RadialGradientColor),
-}
-impl Hash for Color {
-    fn hash<H: Hasher>(&self, hasher: &mut H) {
-		match self {
-			Color::RGBA(color) => {
-				NotNan::new(color.x).unwrap().hash(hasher);
-				NotNan::new(color.y).unwrap().hash(hasher);
-				NotNan::new(color.z).unwrap().hash(hasher);
-				NotNan::new(color.w).unwrap().hash(hasher);
-			},
-			Color::LinearGradient(color) =>  {
-				color.hash(hasher);
-			},
-		}
-    }
 }
 
 impl Color {
@@ -630,6 +584,49 @@ pub enum RadialGradientShape {
     Ellipse,
     Circle,
 }
+pub type Polygon = Vec<f32>;
+
+// color_and_positions: [r, g, b, a, pos,   r, g, b, a, pos], direction: 0-360度
+pub fn to_linear_gradient_color(color_and_positions: &[f32], direction: f32) -> LinearGradientColor {
+    let arr = color_and_positions;
+    let len = arr.len();
+    let count = len / 5;
+    let mut list = Vec::with_capacity(count);
+    for i in 0..count {
+        let start = i * 5;
+        let color_pos = ColorAndPosition {
+            rgba: CgColor::new(arr[start], arr[start + 1], arr[start + 2], arr[start + 3]),
+            position: arr[start + 4],
+        };
+        list.push(color_pos);
+    }
+    LinearGradientColor {
+        direction: direction,
+        list: list,
+    }
+}
+
+// color_and_positions: [r, g, b, a, pos,   r, g, b, a, pos], center_x: 0~1, center_y: 0~1, shape: RadialGradientShape, size: RadialGradientSize
+pub fn to_radial_gradient_color(color_and_positions: &[f32], center_x: f32, center_y: f32, shape: u8, size: u8) -> RadialGradientColor {
+    let arr = color_and_positions;
+    let len = arr.len();
+    let count = len / 5;
+    let mut list = Vec::with_capacity(count);
+    for i in 0..count {
+        let start = i * 5;
+        let color_pos = ColorAndPosition {
+            rgba: CgColor::new(arr[start], arr[start + 1], arr[start + 2], arr[start + 3]),
+            position: arr[start + 4],
+        };
+        list.push(color_pos);
+    }
+    RadialGradientColor {
+        center: (center_x, center_y),
+        shape: unsafe { transmute(shape) },
+        size: unsafe { transmute(size) },
+        list: list,
+    }
+}
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct Stroke {
@@ -638,7 +635,7 @@ pub struct Stroke {
 }
 
 // 图像填充的方式
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum FitType {
     None,
     Fill,
@@ -682,7 +679,7 @@ pub enum LineHeight {
     Percent(f32), //	基于当前字体尺寸的百分比行间距.
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, EnumDefault)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TransformFunc {
     TranslateX(f32),
     TranslateY(f32),
@@ -730,7 +727,7 @@ impl TransformOrigin {
 }
 
 #[derive(Debug)]
-pub enum ShowType {
+enum ShowType {
     Display = 1,    // 0表示 Flex
     Visibility = 2, // 0表示no Visible
     Enable = 12,    // 0表示no Enable
@@ -875,6 +872,23 @@ impl Show {
 impl Default for Show {
     fn default() -> Show { Show(ShowType::Visibility as usize) }
 }
+impl Default for BackgroundImageClip {
+    fn default() -> BackgroundImageClip { BackgroundImageClip(Aabb2::new(Point2::new(0.0, 0.0), Point2::new(1.0, 1.0))) }
+}
+
+pub fn get_size(s: &FontSize) -> usize {
+    match s {
+        &FontSize::None => {
+            // size
+            32 // 默认32px
+        }
+        &FontSize::Length(r) => r,
+        &FontSize::Percent(_r) => {
+            // (r * size as f32).round() as usize;
+            panic!()
+        }
+    }
+}
 
 #[derive(Clone, Default, Deref, DerefMut, Debug, Serialize, Deserialize)]
 pub struct NodeState(pub INode);
@@ -987,6 +1001,4 @@ pub enum StyleType {
     AnimationDirection = 84,
     AnimationFillMode = 85,
     AnimationPlayState = 86,
-
-	ClipPath = 87,
 }
