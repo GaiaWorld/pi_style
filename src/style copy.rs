@@ -3,29 +3,31 @@
 use std::default::Default;
 use std::{
     hash::{Hash, Hasher},
+    mem::transmute,
 };
 
-use bevy_ecs::prelude::Component;
-use bevy_reflect::{Reflect, impl_reflect_value, impl_from_reflect_value, FromReflect};
 use ordered_float::NotNan;
 use pi_curves::easing::EEasingMode;
 use pi_curves::steps::EStepMode;
-use crate::value::{Number, LengthUnit, ImageRepeatOption, FitType};
-use crate::{
-	layout::{
-    	AlignContent, AlignItems, AlignSelf, Direction, FlexDirection, FlexWrap, JustifyContent, PositionType,
-	},
-	value::{Rect, Size as FlexSize, Dimension},
+use pi_flex_layout::style::{
+    AlignContent, AlignItems, AlignSelf, Dimension, Direction, Display, FlexDirection, FlexWrap, JustifyContent, PositionType,
 };
 use smallvec::SmallVec;
 
 use pi_atom::Atom;
+use pi_flex_layout::prelude::{INode, Number, Rect, Size as FlexSize};
 
+pub type Matrix4 = nalgebra::Matrix4<f32>;
 pub type Point2 = nalgebra::Point2<f32>;
-pub type Aabb2 = ncollide2d::bounding_volume::AABB<f32>;
-
+pub type Point3 = nalgebra::Point3<f32>;
+pub type Vector2 = nalgebra::Vector2<f32>;
+pub type Vector3 = nalgebra::Vector3<f32>;
+pub type Vector4 = nalgebra::Vector4<f32>;
 #[derive(Debug, Deref, DerefMut, Clone, Serialize, Deserialize)]
 pub struct CgColor(nalgebra::Vector4<f32>);
+pub type Aabb2 = ncollide2d::bounding_volume::AABB<f32>;
+pub type NotNanRect = Rect<NotNan<f32>>;
+
 impl Hash for CgColor {
     fn hash<H: Hasher>(&self, state: &mut H) {
         unsafe {
@@ -36,8 +38,6 @@ impl Hash for CgColor {
         }
     }
 }
-impl_reflect_value!(CgColor);
-impl_from_reflect_value!(CgColor);
 
 impl CgColor {
     pub fn new(x: f32, y: f32, z: f32, w: f32) -> Self { Self(nalgebra::Vector4::new(x, y, z, w)) }
@@ -51,9 +51,9 @@ impl Default for CgColor {
 pub struct Node;
 
 
-#[derive(Reflect, Default, Debug, Clone, Serialize, Deserialize, Component)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct Animation {
-    pub name: AnimationName,                               // 指定要绑定到选择器的关键帧的名称
+    pub name: SmallVec<[Atom; 1]>,                               // 指定要绑定到选择器的关键帧的名称
     pub duration: SmallVec<[Time; 1]>,                           // 动画指定需要多少毫秒完成
     pub timing_function: SmallVec<[AnimationTimingFunction; 1]>, // 设置动画将如何完成一个周期(插值函数)
     pub iteration_count: SmallVec<[IterationCount; 1]>,
@@ -62,14 +62,6 @@ pub struct Animation {
     pub fill_mode: SmallVec<[AnimationFillMode; 1]>,   // 规定当动画不播放时（当动画完成时，或当动画有一个延迟未开始播放时），要应用到元素的样式。
     pub play_state: SmallVec<[AnimationPlayState; 1]>, // 指定动画是否正在运行或已暂停
 }
-
-#[derive(Debug, Default, Serialize, Clone, Deserialize)]
-pub struct AnimationName {
-	pub value: SmallVec<[Atom; 1]>,
-	pub scope_hash: usize,
-}
-impl_reflect_value!(AnimationName);
-impl_from_reflect_value!(AnimationName);
 
 impl Animation {
     pub fn get_attr<T: Default + Clone>(i: usize, vec: &SmallVec<[T; 1]>) -> T {
@@ -85,8 +77,6 @@ impl Animation {
 /// 动画循环次数
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Deref, DerefMut)]
 pub struct IterationCount(pub f32);
-impl_reflect_value!(IterationCount);
-impl_from_reflect_value!(IterationCount);
 
 // 动画默认播放一次
 impl Default for IterationCount {
@@ -96,11 +86,9 @@ impl Default for IterationCount {
 /// 时间 ，单位 ms
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Deref, DerefMut, Default)]
 pub struct Time(pub usize);
-impl_reflect_value!(Time);
-impl_from_reflect_value!(Time);
 
 /// 动画循环方向
-#[derive(Reflect, FromReflect, Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, EnumDefault)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, EnumDefault)]
 pub enum AnimationDirection {
     /// 每个循环内动画向前循环，换言之，每个动画循环结束，动画重置到起点重新开始，这是默认属性。
     Normal,
@@ -113,7 +101,7 @@ pub enum AnimationDirection {
 }
 
 /// 动画播放状态
-#[derive(Reflect, FromReflect, Debug, Clone, Serialize, Deserialize, EnumDefault)]
+#[derive(Debug, Clone, Serialize, Deserialize, EnumDefault)]
 pub enum AnimationPlayState {
     /// 正在播放
     Running,
@@ -122,7 +110,7 @@ pub enum AnimationPlayState {
 }
 
 /// 设置 CSS 动画在执行之前和之后如何将样式应用于其目标
-#[derive(Reflect, FromReflect, Debug, Clone, Serialize, Deserialize, EnumDefault)]
+#[derive(Debug, Clone, Serialize, Deserialize, EnumDefault)]
 pub enum AnimationFillMode {
     /// 当动画未执行时，动画将不会将任何样式应用于目标，而是已经赋予给该元素的 CSS 规则来显示该元素。这是默认值
     None,
@@ -135,7 +123,7 @@ pub enum AnimationFillMode {
 }
 
 // 淡入淡出方式
-#[derive(Reflect, EnumDefault, Debug, Clone, Serialize, Deserialize)]
+#[derive(EnumDefault, Debug, Clone, Serialize, Deserialize)]
 pub enum EaseFunction {
     Back,
     Circle,
@@ -154,18 +142,114 @@ pub enum EaseFunction {
 pub enum AnimationTimingFunction {
     /// 匀速
     Linear,
-    /// 淡入淡出
+	/// 淡入淡出
     Ease(EEasingMode),
     /// 跳跃
     Step(usize, EStepMode),
     /// 贝塞尔曲线
     CubicBezier(f32, f32, f32, f32),
 }
-impl_reflect_value!(AnimationTimingFunction);
-impl_from_reflect_value!(AnimationTimingFunction);
+
+
+/// 布局大小
+#[derive(Default, Deref, DerefMut, Clone, Serialize, Deserialize, Debug)]
+pub struct Size(pub FlexSize<Dimension>);
+
+/// 布局外边距
+#[derive(Default, Deref, DerefMut, Clone, Serialize, Deserialize, Debug)]
+pub struct Margin(pub Rect<Dimension>);
+
+/// 布局内边距
+#[derive(Default, Deref, DerefMut, Clone, Serialize, Deserialize, Debug)]
+pub struct Padding(pub Rect<Dimension>);
+
+/// 布局边框尺寸
+#[derive(Default, Deref, DerefMut, Clone, Serialize, Deserialize, Debug)]
+pub struct Border(pub Rect<Dimension>);
+
+#[derive(Deref, DerefMut, Clone, Serialize, Deserialize, Debug)]
+pub struct Position(pub Rect<Dimension>);
+
+#[derive(Default, Clone, Serialize, Deserialize, Debug)]
+pub struct MinMax {
+    pub min: FlexSize<Dimension>,
+    pub max: FlexSize<Dimension>,
+}
+
+// 描述子节点行为的flex布局属性
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct FlexContainer {
+    pub flex_direction: FlexDirection,
+    pub flex_wrap: FlexWrap,
+    pub justify_content: JustifyContent,
+    pub align_items: AlignItems,
+    pub align_content: AlignContent,
+    pub direction: Direction,
+}
+
+// 描述节点自身行为的flex布局属性
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub struct FlexNormal {
+    pub order: isize,
+    pub flex_basis: Dimension,
+    pub flex_grow: f32,
+    pub flex_shrink: f32,
+    pub align_self: AlignSelf,
+    pub position_type: PositionType,
+    pub aspect_ratio: Number,
+}
+
+impl Default for Position {
+    fn default() -> Self {
+        Position(Rect {
+            left: Dimension::Undefined,
+            right: Dimension::Undefined,
+            top: Dimension::Undefined,
+            bottom: Dimension::Undefined,
+        })
+    }
+}
+
+impl Default for FlexContainer {
+    fn default() -> Self {
+        FlexContainer {
+            flex_direction: Default::default(),
+            flex_wrap: Default::default(),
+            justify_content: Default::default(),
+            align_items: Default::default(),
+            align_content: AlignContent::FlexStart,
+            direction: Default::default(),
+        }
+    }
+}
+
+impl Default for FlexNormal {
+    fn default() -> Self {
+        Self {
+            order: 0,
+            flex_basis: Dimension::Auto,
+            flex_grow: Default::default(),
+            flex_shrink: Default::default(),
+            align_self: Default::default(),
+            position_type: Default::default(),
+            aspect_ratio: Default::default(),
+        }
+    }
+}
+
+//================================== 组件
+#[derive(Deref, DerefMut, Clone, PartialEq, Eq, Hash, Default, Serialize, Deserialize, Debug)]
+pub struct ZIndex(pub isize);
+
+//超出部分的裁剪方式
+#[derive(Deref, DerefMut, Clone, Default, Serialize, Deserialize, Debug)]
+pub struct Overflow(pub bool);
+//不透明度
+#[derive(Deref, DerefMut, Clone, Debug, Serialize, Deserialize)]
+pub struct Opacity(pub f32);
 
 /// 渲染模式
-#[derive(Reflect, Clone, Debug, Serialize, Deserialize, EnumDefault, Component)]
+#[derive(Clone, Debug, Serialize, Deserialize, EnumDefault)]
 pub enum BlendMode {
     Normal,
     AlphaAdd,
@@ -174,68 +258,134 @@ pub enum BlendMode {
     OneOne,
 }
 
+// 将display、visibility、enable合并为show组件
+#[derive(Deref, DerefMut, Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Show(pub usize);
+
+// 变换
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Transform {
+    pub funcs: Vec<TransformFunc>,
+    pub origin: TransformOrigin,
+}
+
+impl Transform {
+    pub fn add_func(&mut self, f: TransformFunc) { self.funcs.push(f); }
+    pub fn set_origin(&mut self, o: TransformOrigin) { self.origin = o; }
+}
+
+pub type TransformFuncs = Vec<TransformFunc>;
+// 背景色和class
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Deref)]
+pub struct BackgroundColor(pub Color);
+
+// class名称， 支持多个class， 当只有一个或两个class时， 有优化
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Deref, DerefMut)]
+pub struct ClassName(pub SmallVec<[usize; 1]>);
+
+// 边框颜色
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Deref, DerefMut)]
+pub struct BorderColor(pub CgColor);
+
+// 图片路劲及纹理
+#[derive(Debug, Deref, DerefMut, Clone, Serialize, Deserialize, Default, Hash)]
+pub struct BackgroundImage(pub Atom);
+
 // 遮罩图片是图片路径或线性渐变色
-#[derive(Clone, Debug, Serialize, Deserialize, EnumDefault, Component)]
+#[derive(Clone, Debug, Serialize, Deserialize, EnumDefault)]
 pub enum MaskImage {
     Path(Atom),
     LinearGradient(LinearGradientColor),
 }
-impl_reflect_value!(MaskImage);
-impl_from_reflect_value!(MaskImage);
+
+
+#[derive(Debug, Deref, DerefMut, Clone, Serialize, Deserialize)]
+pub struct MaskImageClip(pub Aabb2);
+
+impl Default for MaskImageClip {
+    fn default() -> Self { MaskImageClip(Aabb2::new(Point2::new(0.0, 0.0), Point2::new(1.0, 1.0))) }
+}
 
 // 滤镜， 与CSS的Filter不同， 该滤镜不依赖Filter 函数的先后顺序， 且同种滤镜设置多次，会覆盖前面的设置（css是一种叠加效果）
-#[derive(Reflect, Clone, Debug, Default, Serialize, Deserialize, Component)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Hsi {
     pub hue_rotate: f32,  //色相转换  -0.5 ~ 0.5 , 对应ps的-180 ~180
     pub saturate: f32,    // 饱和度  -1。0 ~1.0 ， 对应ps的 -100 ~ 100
     pub bright_ness: f32, //亮度 -1。0 ~1.0 ， 对应ps的 -100 ~ 100
 }
 
-pub type TransformFuncs = Vec<TransformFunc>;
+#[derive(Clone, Debug, Default, Serialize, Deserialize, Deref, DerefMut)]
+pub struct Blur(pub f32);
 
 //ObjectFit
-#[derive(Reflect, Debug, Clone, Default, Serialize, Deserialize, Component)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct BackgroundImageMod {
     pub object_fit: FitType,
     pub repeat: ImageRepeat,
 }
 
-#[derive(Reflect, Debug, Clone, Serialize, Deserialize, Component)]
+// image图像的uv（仅支持百分比， 不支持像素值）
+#[derive(Debug, Deref, DerefMut, Clone, Serialize, Deserialize)]
+pub struct BackgroundImageClip(pub Aabb2);
+
+// 边框图片
+#[derive(Debug, Deref, DerefMut, Clone, Serialize, Deserialize, Default, Hash)]
+pub struct BorderImage(pub Atom);
+
+// borderImage图像的uv（仅支持百分比， 不支持像素值）
+#[derive(Debug, Deref, DerefMut, Clone, Serialize, Deserialize, Hash)]
+pub struct BorderImageClip(pub NotNanRect);
+
+impl Default for BorderImageClip {
+    fn default() -> Self {
+        Self(NotNanRect {
+            left: unsafe { NotNan::new_unchecked(0.0) },
+            top: unsafe { NotNan::new_unchecked(0.0) },
+            right: unsafe { NotNan::new_unchecked(1.0) },
+            bottom: unsafe { NotNan::new_unchecked(1.0) },
+        })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Hash)]
 pub struct BorderImageSlice {
-    pub top: f32,
-    pub right: f32,
-    pub bottom: f32,
-    pub left: f32,
+    pub top: NotNan<f32>,
+    pub right: NotNan<f32>,
+    pub bottom: NotNan<f32>,
+    pub left: NotNan<f32>,
     pub fill: bool,
 }
 
 impl Default for BorderImageSlice {
     fn default() -> Self {
         Self {
-            left: 0.0,
-            top: 0.0,
-            right: 0.0,
-            bottom: 0.0,
+            left: unsafe { NotNan::new_unchecked(0.0) },
+            top: unsafe { NotNan::new_unchecked(0.0) },
+            right: unsafe { NotNan::new_unchecked(0.0) },
+            bottom: unsafe { NotNan::new_unchecked(0.0) },
             fill: true,
         }
     }
 }
 
-#[derive(Reflect, Debug, Clone, Default, Serialize, Deserialize, Hash)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Hash, Deref, DerefMut)]
+pub struct BorderImageRepeat(pub ImageRepeat);
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Hash)]
 pub struct ImageRepeat {
     pub x: ImageRepeatOption,
     pub y: ImageRepeatOption,
 }
 
 // 圆角， 目前仅支持x分量
-#[derive(Reflect, Debug, Clone, Default, Serialize, Deserialize, Component)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct BorderRadius {
     pub x: LengthUnit,
     pub y: LengthUnit,
 }
 
 // 参考CSS的box-shadow的语法
-#[derive(Reflect, Debug, Clone, Default, Serialize, Deserialize, Component)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct BoxShadow {
     pub h: f32,         // 水平偏移，正右负左
     pub v: f32,         // 垂直偏移，正下负上
@@ -244,14 +394,8 @@ pub struct BoxShadow {
     pub color: CgColor, // 阴影颜色
 }
 
-// 文本内容
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Component)]
-pub struct TextContent(pub String, pub Atom);
-impl_reflect_value!(TextContent);
-impl_from_reflect_value!(TextContent);
-
 // 文字样式
-#[derive(Reflect, Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Text {
     pub letter_spacing: f32,     //字符间距， 单位：像素
     pub word_spacing: f32,       //字符间距， 单位：像素
@@ -264,7 +408,54 @@ pub struct Text {
     pub vertical_align: VerticalAlign,
 }
 
-#[derive(Reflect, Debug, Clone, Default, Serialize, Deserialize)]
+// 文本内容
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TextContent(pub String, pub Atom);
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TextStyle {
+    pub color: Color, //颜色
+    pub text_indent: f32,
+    pub text_stroke: Stroke,
+    pub text_align: TextAlign,
+    pub text_shadow: TextShadows, // 缩进， 单位： 像素
+    pub letter_spacing: f32,      //字符间距， 单位：像素
+    pub word_spacing: f32,        //字符间距， 单位：像素
+    pub white_space: WhiteSpace,  //空白处理
+    pub line_height: LineHeight,  //设置行高
+    pub vertical_align: VerticalAlign,
+
+    pub font_style: FontStyle, //	规定字体样式。参阅：font-style 中可能的值。
+    pub font_weight: usize,    //	规定字体粗细。参阅：font-weight 中可能的值。
+    pub font_size: FontSize,   //
+    pub font_family: Atom,     //	规定字体系列。参阅：font-family 中可能的值。
+}
+
+impl Default for TextStyle {
+    fn default() -> Self {
+        Self {
+            color: Default::default(),
+            text_indent: Default::default(),
+            text_stroke: Default::default(),
+            text_align: Default::default(),
+            text_shadow: Default::default(),
+            letter_spacing: Default::default(),
+            word_spacing: Default::default(),
+            white_space: Default::default(),
+            line_height: Default::default(),
+            vertical_align: Default::default(),
+            font_style: Default::default(),
+            font_weight: 500,
+            font_size: Default::default(),
+            font_family: Default::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Deref, DerefMut)]
+pub struct TextShadows(pub SmallVec<[TextShadow; 1]>);
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TextShadow {
     pub h: f32,         //	必需。水平阴影的位置。允许负值。	测试
     pub v: f32,         //	必需。垂直阴影的位置。允许负值。	测试
@@ -272,8 +463,41 @@ pub struct TextShadow {
     pub color: CgColor, //	可选。阴影的颜色。参阅 CSS 颜色值。
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Font {
+    pub style: FontStyle, //	规定字体样式。参阅：font-style 中可能的值。
+    pub weight: usize,    //	规定字体粗细。参阅：font-weight 中可能的值。
+    pub size: FontSize,   //
+    pub family: usize,    //	规定字体系列。参阅：font-family 中可能的值。
+}
+
+// TransformWillChange， 用于优化频繁变化的Transform
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+pub struct TransformWillChange(pub Transform);
+
+impl Default for Font {
+    fn default() -> Self {
+        Self {
+            style: FontStyle::default(),
+            weight: 500,
+            size: FontSize::default(),
+            family: 0,
+        }
+    }
+}
+
 // #[derive(Debug)]
 // pub struct Quad(pub Point2, pub Point2, pub Point2, pub Point2);
+
+pub enum LengthUnitType {
+    Pixel,
+    Percent,
+}
+#[derive(Clone, Copy, Debug, EnumDefault, Serialize, Deserialize)]
+pub enum LengthUnit {
+    Pixel(f32),
+    Percent(f32),
+}
 
 // #[derive(Clone, Copy, Debug, EnumDefault, Serialize, Deserialize)]
 // pub enum Display {
@@ -288,8 +512,6 @@ pub enum Color {
     LinearGradient(LinearGradientColor),
     // RadialGradient(RadialGradientColor),
 }
-impl_reflect_value!(Color);
-impl_from_reflect_value!(Color);
 
 impl Color {
     #[inline]
@@ -320,8 +542,6 @@ pub struct LinearGradientColor {
     pub direction: f32,
     pub list: Vec<ColorAndPosition>,
 }
-impl_reflect_value!(LinearGradientColor);
-impl_from_reflect_value!(LinearGradientColor);
 
 impl Hash for LinearGradientColor {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
@@ -343,8 +563,6 @@ pub struct RadialGradientColor {
     pub size: RadialGradientSize,
     pub list: Vec<ColorAndPosition>,
 }
-impl_reflect_value!(RadialGradientColor);
-impl_from_reflect_value!(RadialGradientColor);
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ColorAndPosition {
@@ -352,10 +570,8 @@ pub struct ColorAndPosition {
     pub position: f32,
     pub rgba: CgColor,
 }
-impl_reflect_value!(ColorAndPosition);
-impl_from_reflect_value!(ColorAndPosition);
 
-#[derive(Reflect, Debug, Clone, Copy, EnumDefault, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, EnumDefault, Serialize, Deserialize)]
 pub enum RadialGradientSize {
     ClosestSide,
     FarthesSide,
@@ -363,19 +579,91 @@ pub enum RadialGradientSize {
     Farthescorner,
 }
 
-#[derive(Reflect, Debug, Clone, Copy, EnumDefault, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, EnumDefault, Serialize, Deserialize)]
 pub enum RadialGradientShape {
     Ellipse,
     Circle,
 }
+pub type Polygon = Vec<f32>;
 
-#[derive(Reflect, Default, Debug, Clone, Serialize, Deserialize)]
+// color_and_positions: [r, g, b, a, pos,   r, g, b, a, pos], direction: 0-360度
+pub fn to_linear_gradient_color(color_and_positions: &[f32], direction: f32) -> LinearGradientColor {
+    let arr = color_and_positions;
+    let len = arr.len();
+    let count = len / 5;
+    let mut list = Vec::with_capacity(count);
+    for i in 0..count {
+        let start = i * 5;
+        let color_pos = ColorAndPosition {
+            rgba: CgColor::new(arr[start], arr[start + 1], arr[start + 2], arr[start + 3]),
+            position: arr[start + 4],
+        };
+        list.push(color_pos);
+    }
+    LinearGradientColor {
+        direction: direction,
+        list: list,
+    }
+}
+
+// color_and_positions: [r, g, b, a, pos,   r, g, b, a, pos], center_x: 0~1, center_y: 0~1, shape: RadialGradientShape, size: RadialGradientSize
+pub fn to_radial_gradient_color(color_and_positions: &[f32], center_x: f32, center_y: f32, shape: u8, size: u8) -> RadialGradientColor {
+    let arr = color_and_positions;
+    let len = arr.len();
+    let count = len / 5;
+    let mut list = Vec::with_capacity(count);
+    for i in 0..count {
+        let start = i * 5;
+        let color_pos = ColorAndPosition {
+            rgba: CgColor::new(arr[start], arr[start + 1], arr[start + 2], arr[start + 3]),
+            position: arr[start + 4],
+        };
+        list.push(color_pos);
+    }
+    RadialGradientColor {
+        center: (center_x, center_y),
+        shape: unsafe { transmute(shape) },
+        size: unsafe { transmute(size) },
+        list: list,
+    }
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct Stroke {
-    pub width: f32, //	描边宽度
+    pub width: NotNan<f32>, //	描边宽度
     pub color: CgColor,     //	描边颜色
 }
 
-#[derive(Reflect, Debug, Clone, Copy, EnumDefault, Serialize, Deserialize)]
+// 图像填充的方式
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum FitType {
+    None,
+    Fill,
+    Contain,
+    Cover,
+    ScaleDown,
+    // Repeat,
+    // RepeatX,
+    // RepeatY,
+}
+
+impl Default for FitType {
+    fn default() -> Self { FitType::Fill }
+}
+
+#[derive(Debug, Clone, Copy, EnumDefault, Serialize, Deserialize, Hash, PartialEq, Eq)]
+pub enum ImageRepeatOption {
+    /// 拉伸源图像的边缘区域以填充每个边界之间的间隙。
+    Stretch,
+    /// 源图像的边缘区域被平铺（重复）以填充每个边界之间的间隙。可以修剪瓷砖以实现适当的配合。
+    Repeat,
+    /// 源图像的边缘区域被平铺（重复）以填充每个边界之间的间隙。可以拉伸瓷砖以实现适当的配合。
+    Round,
+    /// 源图像的边缘区域被平铺（重复）以填充每个边界之间的间隙。可以缩小瓷砖以实现适当的配合。
+    Space,
+}
+
+#[derive(Debug, Clone, Copy, EnumDefault, Serialize, Deserialize)]
 pub enum FontSize {
     None,          // 默认尺寸。
     Length(usize), //把 font-size 设置为一个固定的值。
@@ -383,7 +671,7 @@ pub enum FontSize {
 }
 
 //设置行高
-#[derive(Reflect, Debug, Clone, Copy, EnumDefault, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, EnumDefault, Serialize, Deserialize)]
 pub enum LineHeight {
     Normal,       //设置合理的行间距（等于font-size）
     Length(f32),  //固定像素
@@ -391,7 +679,7 @@ pub enum LineHeight {
     Percent(f32), //	基于当前字体尺寸的百分比行间距.
 }
 
-#[derive(Reflect, Debug, Clone, Serialize, Deserialize, EnumDefault)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TransformFunc {
     TranslateX(f32),
     TranslateY(f32),
@@ -419,8 +707,6 @@ pub enum TransformOrigin {
     Center,
     XY(LengthUnit, LengthUnit),
 }
-impl_reflect_value!(TransformOrigin);
-impl_from_reflect_value!(TransformOrigin);
 
 impl TransformOrigin {
     pub fn to_value(&self, width: f32, height: f32) -> Point2 {
@@ -441,13 +727,13 @@ impl TransformOrigin {
 }
 
 #[derive(Debug)]
-pub enum ShowType {
+enum ShowType {
     Display = 1,    // 0表示 Flex
     Visibility = 2, // 0表示no Visible
     Enable = 12,    // 0表示no Enable
 }
 
-#[derive(Reflect, Debug, Clone, EnumDefault, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, EnumDefault, Copy, Serialize, Deserialize)]
 pub enum Enable {
     Auto = 0,
     None = 1,
@@ -487,7 +773,7 @@ pub enum Enable {
 // }
 
 //对齐元素中的文本
-#[derive(Reflect, Debug, Clone, Copy, EnumDefault, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, EnumDefault, Hash, Serialize, Deserialize)]
 pub enum TextAlign {
     Left,    //把文本排列到左边。默认值：由浏览器决定。
     Right,   //把文本排列到右边。
@@ -496,7 +782,7 @@ pub enum TextAlign {
 }
 
 //设置元素中空白的处理方式
-#[derive(Reflect, Debug, Clone, Copy, EnumDefault, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, EnumDefault, Hash, Serialize, Deserialize)]
 pub enum WhiteSpace {
     Normal,  //	默认。空白会被浏览器忽略(其实是所有的空白被合并成一个空格), 超出范围会换行。
     Nowrap,  //	空白会被浏览器忽略(其实是所有的空白被合并成一个空格), 超出范围文本也不会换行，文本会在在同一行上继续，直到遇到 <br> 标签为止。
@@ -532,21 +818,80 @@ impl WhiteSpace {
     }
 }
 
-#[derive(Reflect, Debug, Clone, Copy, EnumDefault, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, EnumDefault, Hash, Serialize, Deserialize)]
 pub enum FontStyle {
     Normal,  //	默认值。标准的字体样式。
     Ttalic,  //	斜体的字体样式。
     Oblique, //	倾斜的字体样式。
 }
-#[derive(Reflect, Debug, Clone, Copy, EnumDefault, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, EnumDefault, Hash, Serialize, Deserialize)]
 pub enum VerticalAlign {
     Top,
     Middle,
     Bottom,
 }
 
-// #[derive(Clone, Default, Deref, DerefMut, Debug, Serialize, Deserialize)]
-// pub struct NodeState(pub INode);
+impl Default for Opacity {
+    fn default() -> Opacity { Opacity(1.0) }
+}
+
+impl Show {
+    #[inline]
+    pub fn get_display(&self) -> Display { unsafe { transmute((self.0 & (ShowType::Display as usize)) as u8) } }
+
+    #[inline]
+    pub fn set_display(&mut self, display: Display) {
+        match display {
+            Display::Flex => self.0 &= !(ShowType::Display as usize),
+            Display::None => self.0 |= ShowType::Display as usize,
+        }
+    }
+
+    #[inline]
+    pub fn get_visibility(&self) -> bool { (self.0 & (ShowType::Visibility as usize)) != 0 }
+
+    #[inline]
+    pub fn set_visibility(&mut self, visibility: bool) {
+        if visibility {
+            self.0 |= ShowType::Visibility as usize;
+        } else {
+            self.0 &= !(ShowType::Visibility as usize);
+        }
+    }
+
+    #[inline]
+    pub fn get_enable(&self) -> Enable {
+        let r = unsafe { transmute(((self.0 & (ShowType::Enable as usize)) >> 2) as u8) };
+        r
+    }
+
+    #[inline]
+    pub fn set_enable(&mut self, enable: Enable) { self.0 = self.0 & !(ShowType::Enable as usize) | ((enable as usize) << 2); }
+}
+
+impl Default for Show {
+    fn default() -> Show { Show(ShowType::Visibility as usize) }
+}
+impl Default for BackgroundImageClip {
+    fn default() -> BackgroundImageClip { BackgroundImageClip(Aabb2::new(Point2::new(0.0, 0.0), Point2::new(1.0, 1.0))) }
+}
+
+pub fn get_size(s: &FontSize) -> usize {
+    match s {
+        &FontSize::None => {
+            // size
+            32 // 默认32px
+        }
+        &FontSize::Length(r) => r,
+        &FontSize::Percent(_r) => {
+            // (r * size as f32).round() as usize;
+            panic!()
+        }
+    }
+}
+
+#[derive(Clone, Default, Deref, DerefMut, Debug, Serialize, Deserialize)]
+pub struct NodeState(pub INode);
 
 // 枚举样式的类型
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -657,6 +1002,3 @@ pub enum StyleType {
     AnimationFillMode = 85,
     AnimationPlayState = 86,
 }
-
-impl_reflect_value!(StyleType);
-impl_from_reflect_value!(StyleType);

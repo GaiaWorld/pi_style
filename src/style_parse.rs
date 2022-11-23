@@ -4,25 +4,27 @@ use std::collections::hash_map::Entry;
 use std::str::FromStr;
 use std::{collections::VecDeque, intrinsics::transmute};
 
+use bevy_reflect::Reflect;
 use bitvec::prelude::BitArray;
 use cssparser::{CowRcStr, Delimiter, ParseError, Parser, ParserInput, Token};
-use ordered_float::NotNan;
 use pi_atom::Atom;
 use pi_curves::steps::EStepMode;
-use pi_flex_layout::{
-    prelude::Rect,
-    style::{AlignContent, AlignItems, AlignSelf, Dimension, Display, FlexDirection, FlexWrap, JustifyContent, PositionType},
-};
 use pi_hash::XHashMap;
 use smallvec::SmallVec;
+use ordered_float::NotNan;
 
-use crate::style::{
-    Animation, AnimationDirection, AnimationFillMode, AnimationPlayState, AnimationTimingFunction, BlendMode, BorderImageSlice, BorderRadius,
-    BoxShadow, CgColor, Color, ColorAndPosition, Enable, FitType, FontSize, Hsi, ImageRepeat, ImageRepeatOption, IterationCount, LengthUnit,
-    LineHeight, LinearGradientColor, MaskImage, NotNanRect, Stroke, TextAlign, TextShadow, Time, TransformFunc, TransformOrigin, WhiteSpace, AnimationName,
+use crate::{
+	style::{
+		Animation, AnimationDirection, AnimationFillMode, AnimationPlayState, AnimationTimingFunction, BorderImageSlice, BlendMode,  BorderRadius,
+		BoxShadow, CgColor, Color, ColorAndPosition, Enable, FontSize, Hsi, ImageRepeat, IterationCount, LineHeight, LinearGradientColor, MaskImage, Stroke, TextAlign, TextShadow, Time, TransformFunc, TransformOrigin, WhiteSpace, AnimationName,
+	},
+	value::{Rect, Dimension, LengthUnit, FitType, ImageRepeatOption,},
+	layout::{AlignContent, AlignItems, AlignSelf, Display, FlexDirection, FlexWrap, JustifyContent, PositionType},
 };
 
 use super::style_type::*;
+
+type NotNanRect = Rect<f32>;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Attribute {
@@ -756,26 +758,26 @@ fn parse_border_image_slice<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Border
 
     Ok(BorderImageSlice {
         top: match NotNan::new(r[0]) {
-            Ok(r) => r,
-            Err(_) => unsafe { NotNan::new_unchecked(0.0) },
+            Ok(r) => *r,
+            Err(_) => 0.0,
         },
         right: match NotNan::new(r[1]) {
-            Ok(r) => r,
-            Err(_) => unsafe { NotNan::new_unchecked(0.0) },
+            Ok(r) => *r,
+            Err(_) => 0.0,
         },
         bottom: match NotNan::new(r[2]) {
-            Ok(r) => r,
-            Err(_) => unsafe { NotNan::new_unchecked(0.0) },
+            Ok(r) => *r,
+            Err(_) => 0.0,
         },
         left: match NotNan::new(r[3]) {
-            Ok(r) => r,
-            Err(_) => unsafe { NotNan::new_unchecked(0.0) },
+            Ok(r) => *r,
+            Err(_) => 0.0,
         },
         fill,
     })
 }
 
-fn parse_top_right_bottom_left<'i, 't, T: StyleParse + Copy + Default>(
+fn parse_top_right_bottom_left<'i, 't, T: StyleParse + Copy + Default + Reflect>(
     input: &mut Parser<'i, 't>,
 ) -> Result<Rect<T>, ParseError<'i, ValueParseErrorKind<'i>>> {
     let r = match input.try_parse(|input| T::parse(input)) {
@@ -1014,7 +1016,7 @@ fn parse_text_stroke<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Stroke, Parse
     let location = input.current_source_location();
     Ok(Stroke {
         width: match NotNan::new(parse_len(input)?) {
-            Ok(r) => r,
+            Ok(r) => *r,
             Err(_) => return Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
         },
         color: parse_color(input)?,
@@ -2053,7 +2055,7 @@ where
     }
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, Reflect)]
 pub struct Percentage(pub f32);
 
 impl StyleParse for Percentage {

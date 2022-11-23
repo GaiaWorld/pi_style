@@ -5,24 +5,23 @@
 use std::mem::forget;
 
 use bitvec::array::BitArray;
-use ordered_float::NotNan;
 use pi_atom::Atom;
-use pi_flex_layout::{
-    prelude::{Number, Rect},
-    style::{
-        AlignContent, AlignItems, AlignSelf, Dimension, Direction, Display, FlexDirection, FlexWrap, JustifyContent, PositionType as PositionType1,
-    },
-};
 use pi_hash::XHashMap;
 use smallvec::SmallVec;
 
-use crate::style::{
-    Aabb2, AnimationDirection, AnimationFillMode, AnimationPlayState, AnimationTimingFunction, BlendMode, BorderImageSlice, BorderRadius, BoxShadow,
-    CgColor, Color, Enable, FitType, FontSize, FontStyle, Hsi, ImageRepeat, IterationCount, LengthUnit, LineHeight, MaskImage, NotNanRect, Point2,
-    Stroke, StyleType, TextAlign, TextContent, TextShadow, Time, TransformFunc, TransformFuncs, TransformOrigin, VerticalAlign, WhiteSpace, AnimationName,
+use crate::{ 
+	style::{
+		Aabb2, AnimationDirection, AnimationFillMode, AnimationPlayState, AnimationTimingFunction, BlendMode, BorderImageSlice, BorderRadius, BoxShadow,
+		CgColor, Color, Enable, FontSize, FontStyle, Hsi, ImageRepeat, IterationCount, LineHeight, MaskImage, Point2,
+		Stroke, StyleType, TextAlign, TextContent, TextShadow, Time, TransformFunc, TransformFuncs, TransformOrigin, VerticalAlign, WhiteSpace, AnimationName,
+	},
+	layout::{ AlignContent, AlignItems, AlignSelf, Direction, Display, FlexDirection, FlexWrap, JustifyContent, PositionType as PositionType1,},
+	value::{Number, Rect, Dimension, FitType, LengthUnit},
 };
 use pi_curves::curve::frame::{FrameValueScale, KeyFrameCurveValue};
 use std::ops::Add;
+
+type NotNanRect = Rect<f32>;
 
 pub trait Attr: 'static + Sync + Send {
     /// 获取样式属性类型
@@ -840,7 +839,6 @@ impl AnimatableValue for NotNanRect {
     fn add(&self, rhs: &Self) -> Self { NotNanRect::new(self.left + rhs.left, self.right + rhs.right, self.top + rhs.top, self.bottom + rhs.bottom) }
     #[inline]
     fn scale(&self, other: f32) -> Self {
-        let other = NotNan::new(other).unwrap();
         NotNanRect::new(self.left * other, self.right * other, self.top * other, self.bottom * other)
     }
 }
@@ -877,7 +875,6 @@ impl AnimatableValue for BorderImageSlice {
     }
     #[inline]
     fn scale(&self, other: f32) -> Self {
-        let other = NotNan::new(other).unwrap();
         Self {
             left: self.left * other,
             right: self.right * other,

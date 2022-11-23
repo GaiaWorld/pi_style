@@ -10,4 +10,7 @@ extern crate paste;
 pub mod style;
 pub mod style_parse;
 pub mod style_type;
+pub mod layout;
+pub mod value;
+pub mod nan;
 
