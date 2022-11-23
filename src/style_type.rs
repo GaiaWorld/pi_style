@@ -11,12 +11,12 @@ use smallvec::SmallVec;
 
 use crate::{ 
 	style::{
-		Aabb2, AnimationDirection, AnimationFillMode, AnimationPlayState, AnimationTimingFunction, BlendMode, BorderImageSlice, BorderRadius, BoxShadow,
+		Aabb2, AnimationDirection, AnimationFillMode, AnimationPlayState, AnimationTimingFunction, BlendMode, BorderImageSlice, BoxShadow,
 		CgColor, Color, Enable, FontSize, FontStyle, Hsi, ImageRepeat, IterationCount, LineHeight, MaskImage, Point2,
 		Stroke, StyleType, TextAlign, TextContent, TextShadow, Time, TransformFunc, TransformFuncs, TransformOrigin, VerticalAlign, WhiteSpace, AnimationName,
 	},
 	layout::{ AlignContent, AlignItems, AlignSelf, Direction, Display, FlexDirection, FlexWrap, JustifyContent, PositionType as PositionType1,},
-	value::{Number, Rect, Dimension, FitType, LengthUnit},
+	value::{Number, Rect, Dimension, FitType, LengthUnit, BaseShape, Center, BorderRadius},
 };
 use pi_curves::curve::frame::{FrameValueScale, KeyFrameCurveValue};
 use std::ops::Add;

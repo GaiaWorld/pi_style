@@ -24,44 +24,6 @@ use pi_atom::Atom;
 pub type Point2 = nalgebra::Point2<f32>;
 pub type Aabb2 = ncollide2d::bounding_volume::AABB<f32>;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum BaseShape {
-	Circle {
-		radius: LengthUnit,
-		center: Center,
-	},
-	Ellipse {
-		rx: LengthUnit,
-		ry: LengthUnit,
-		center: Center,
-	},
-	Inset {
-		rect_box: [LengthUnit;4],
-		border_radius: BorderRadius,
-	},
-	Sector {
-		rotate: f32, // 旋转 （单位： 弧度）
-		angle: f32, // 弧度角
-		radius: LengthUnit, // 半径
-		center: Center
-	}
-}
-
-impl Default for BaseShape {
-    fn default() -> Self {
-        BaseShape::Circle {
-			radius: Default::default(),
-			center: Default::default(),
-		}
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct Center {
-	pub x: LengthUnit,
-	pub y: LengthUnit
-}
-
 #[derive(Debug, Deref, DerefMut, Clone, Serialize, Deserialize)]
 pub struct CgColor(nalgebra::Vector4<f32>);
 impl Hash for CgColor {
@@ -263,13 +225,6 @@ impl Default for BorderImageSlice {
 pub struct ImageRepeat {
     pub x: ImageRepeatOption,
     pub y: ImageRepeatOption,
-}
-
-// 圆角， 目前仅支持x分量
-#[derive(Reflect, Debug, Clone, Default, Serialize, Deserialize, Component)]
-pub struct BorderRadius {
-    pub x: [LengthUnit; 4],
-	pub y: [LengthUnit; 4],
 }
 
 // 参考CSS的box-shadow的语法

@@ -13,9 +13,10 @@ use pi_hash::XHashMap;
 use smallvec::SmallVec;
 use ordered_float::NotNan;
 
+use crate::value::{BaseShape, BorderRadius, Center};
 use crate::{
 	style::{
-		Animation, AnimationDirection, AnimationFillMode, AnimationPlayState, AnimationTimingFunction, BorderImageSlice, BlendMode,  BorderRadius,
+		Animation, AnimationDirection, AnimationFillMode, AnimationPlayState, AnimationTimingFunction, BorderImageSlice, BlendMode,
 		BoxShadow, CgColor, Color, ColorAndPosition, Enable, FontSize, Hsi, ImageRepeat, IterationCount, LineHeight, LinearGradientColor, MaskImage, Stroke, TextAlign, TextShadow, Time, TransformFunc, TransformOrigin, WhiteSpace, AnimationName,
 	},
 	value::{Rect, Dimension, LengthUnit, FitType, ImageRepeatOption,},

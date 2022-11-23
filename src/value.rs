@@ -93,7 +93,7 @@ pub enum ImageRepeatOption {
 }
 
 // 图像填充的方式
-#[derive(Reflect, Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[derive(Reflect, Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default, Hash)]
 pub enum FitType {
     None,
 	#[default]
@@ -104,6 +104,51 @@ pub enum FitType {
     // Repeat,
     // RepeatX,
     // RepeatY,
+}
+
+// 圆角， 目前仅支持x分量
+#[derive(Reflect, Debug, Clone, Default, Serialize, Deserialize)]
+pub struct BorderRadius {
+    pub x: [LengthUnit; 4],
+	pub y: [LengthUnit; 4],
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum BaseShape {
+	Circle {
+		radius: LengthUnit,
+		center: Center,
+	},
+	Ellipse {
+		rx: LengthUnit,
+		ry: LengthUnit,
+		center: Center,
+	},
+	Inset {
+		rect_box: [LengthUnit;4],
+		border_radius: BorderRadius,
+	},
+	Sector {
+		rotate: f32, // 旋转 （单位： 弧度）
+		angle: f32, // 弧度角
+		radius: LengthUnit, // 半径
+		center: Center
+	}
+}
+
+impl Default for BaseShape {
+    fn default() -> Self {
+        BaseShape::Circle {
+			radius: Default::default(),
+			center: Default::default(),
+		}
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct Center {
+	pub x: LengthUnit,
+	pub y: LengthUnit
 }
 
 const fn aa(x: u32) -> u32 {
