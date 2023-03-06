@@ -131,17 +131,6 @@ pub struct AnimationName {
 	pub scope_hash: usize,
 }
 
-impl Animation {
-    pub fn get_attr<T: Default + Clone>(i: usize, vec: &SmallVec<[T; 1]>) -> T {
-        if vec.len() > 0 {
-            let i = i % vec.len();
-            vec[i].clone()
-        } else {
-            T::default()
-        }
-    }
-}
-
 /// 动画循环次数
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Deref, DerefMut)]
 pub struct IterationCount(pub f32);
@@ -376,16 +365,6 @@ pub struct Hsi {
     pub hue_rotate: f32,  //色相转换  -0.5 ~ 0.5 , 对应ps的-180 ~180
     pub saturate: f32,    // 饱和度  -1。0 ~1.0 ， 对应ps的 -100 ~ 100
     pub bright_ness: f32, //亮度 -1。0 ~1.0 ， 对应ps的 -100 ~ 100
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize, Deref, DerefMut)]
-pub struct Blur(pub f32);
-
-//ObjectFit
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Hash)]
-pub struct BackgroundImageMod {
-    pub object_fit: FitType,
-    pub repeat: ImageRepeat,
 }
 
 // image图像的uv（仅支持百分比， 不支持像素值）

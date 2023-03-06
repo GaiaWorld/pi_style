@@ -17,7 +17,7 @@ use pi_hash::XHashMap;
 use smallvec::SmallVec;
 
 use crate::style::{
-    Aabb2, AnimationDirection, AnimationFillMode, AnimationPlayState, AnimationTimingFunction, BlendMode, BorderImageSlice, BorderRadius, BoxShadow,
+    Aabb2, AnimationDirection, AnimationFillMode, AnimationPlayState, Animation, AnimationTimingFunction, BlendMode, BorderImageSlice, BorderRadius, BoxShadow,
     CgColor, Color, Enable, FitType, FontSize, FontStyle, Hsi, ImageRepeat, IterationCount, LengthUnit, LineHeight, MaskImage, NotNanRect, Point2,
     Stroke, StyleType, TextAlign, TextContent, TextShadow, Time, TransformFunc, TransformFuncs, TransformOrigin, VerticalAlign, WhiteSpace, AnimationName, BaseShape, Center,
 };
@@ -486,6 +486,7 @@ impl_style!(
     SmallVec<[AnimationPlayState; 1]>
 );
 
+// impl_style!(ZIndexType, z_index, ZIndex, isize);
 
 macro_rules! impl_interpolation {
     (@keep, $ty: ident) => {

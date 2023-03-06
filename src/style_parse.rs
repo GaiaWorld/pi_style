@@ -131,7 +131,7 @@ pub enum Attribute {
 	ClipPath(ClipPathType),   // 87
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
 pub struct KeyFrameList {
     pub frames: XHashMap<Atom, XHashMap<NotNan<f32>, VecDeque<Attribute>>>,
 	pub scope_hash: usize,
@@ -143,10 +143,10 @@ pub struct KeyFrameList {
 // 	attrs: VecDeque<Attribute>, // 属性, key为属性索引
 // }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
 pub struct ClassMap {
-    attrs: VecDeque<Attribute>,
-    classes: Vec<ClassItem>,
+    pub attrs: VecDeque<Attribute>,
+    pub classes: Vec<ClassItem>,
 
     pub key_frames: KeyFrameList,
 }
@@ -543,10 +543,10 @@ impl ClassMap {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ClassItem {
-    count: usize,
-    class_name: usize,
+    pub count: usize,
+    pub class_name: usize,
 }
 
 pub fn parse_class_map_from_string(value: &str, scope_hash: usize) -> Result<ClassMap, String> {
