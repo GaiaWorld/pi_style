@@ -11,7 +11,7 @@ fn main() {
         let file = read(dwcss.path());
         if let Ok(r) = file {
             let file = String::from_utf8(r).unwrap();
-            let r = parse_class_map_from_string(file.as_str(), 0).unwrap();
+            let _r = parse_class_map_from_string(file.as_str(), 0).unwrap();
         }
     };
     visit_dirs(&Path::new("examples/style_parse/resource/pi_demo_psd/"), &mut cb).unwrap();

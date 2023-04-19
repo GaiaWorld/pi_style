@@ -5,7 +5,7 @@ use std::str::FromStr;
 use std::{collections::VecDeque, intrinsics::transmute};
 
 use bitvec::prelude::BitArray;
-use cssparser::{CowRcStr, Delimiter, ParseError, Parser, ParserInput, Token};
+use cssparser::{CowRcStr, Delimiter, ParseError, Parser, ParserInput, Token, BasicParseError, SourceLocation, ParseErrorKind, BasicParseErrorKind};
 use ordered_float::NotNan;
 use pi_atom::Atom;
 use pi_curves::steps::EStepMode;
@@ -15,6 +15,7 @@ use pi_flex_layout::{
 };
 use pi_hash::XHashMap;
 use smallvec::SmallVec;
+use thiserror::Error;
 
 use crate::style::{
     Animation, AnimationDirection, AnimationFillMode, AnimationPlayState, AnimationTimingFunction, BlendMode, BorderImageSlice, BorderRadius,
@@ -147,7 +148,6 @@ pub struct KeyFrameList {
 pub struct ClassMap {
     pub attrs: VecDeque<Attribute>,
     pub classes: Vec<ClassItem>,
-
     pub key_frames: KeyFrameList,
 }
 
@@ -543,6 +543,7 @@ impl ClassMap {
     }
 }
 
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ClassItem {
     pub count: usize,
@@ -550,7 +551,7 @@ pub struct ClassItem {
 }
 
 pub fn parse_class_map_from_string(value: &str, scope_hash: usize) -> Result<ClassMap, String> {
-    let mut classes = ClassMap::default();
+    let mut classes: ClassMap = ClassMap::default();
     let mut input = ParserInput::new(value);
     let mut parse = Parser::new(&mut input);
 
@@ -576,14 +577,13 @@ pub fn parse_style_list_from_string(value: &str, scope_hash: usize) -> Result<Ve
 }
 
 // 解析css文件中的每一项
-pub fn parse_css_item<'i, 't>(context: &mut ClassMap, input: &mut Parser<'i, 't>, scope_hash: usize) -> Result<(), ParseError<'i, ValueParseErrorKind<'i>>> {
-    // log::debug!("next==============={:?}", input.next());
+pub fn parse_css_item<'i, 't>(context: &mut ClassMap, input: &mut Parser<'i, 't>, scope_hash: usize) -> Result<(), TokenParseError<'i>> {
     let next = input.next()?;
     match next {
         Token::Delim(r) if r == &'.' => {
             // 解析class
             let class_name = input.expect_ident()?.as_ref();
-            log::info!("class: {}", class_name);
+            log::trace!("class: {}", class_name);
 
             let class_name = match usize::from_str(&class_name[1..class_name.len()]) {
                 Ok(r) => r,
@@ -592,15 +592,9 @@ pub fn parse_css_item<'i, 't>(context: &mut ClassMap, input: &mut Parser<'i, 't>
 
             let start = context.attrs.len();
             input.expect_curly_bracket_block()?;
-            match input.parse_nested_block::<_, _, ValueParseErrorKind<'i>>(|i| {
-                parser_style_items(i, &mut context.attrs, scope_hash)?;
-                Ok(())
-            }) {
-                Ok(r) => r,
-                Err(r) => {
-                    log::error!("parse_class fail, {:?}", r);
-                }
-            };
+            let _ = input.parse_nested_block::<_, _, TokenErrorsInfo<'i>>(|i| {
+                Ok(parser_style_items(i, &mut context.attrs, scope_hash))
+            });
 
             if class_name != usize::MAX {
                 context.classes.push(ClassItem {
@@ -612,7 +606,7 @@ pub fn parse_css_item<'i, 't>(context: &mut ClassMap, input: &mut Parser<'i, 't>
         Token::AtKeyword(name) if &**name == "keyframes" => {
             // 解析keyframes
             let name = input.expect_ident()?;
-            log::debug!("parse keyframes start: {:?}", name);
+            log::trace!("parse keyframes start: {:?}", name);
             let name = Atom::from(&**name);
             let key_frames = parse_key_frames(input, scope_hash)?;
             if key_frames.len() > 0 {
@@ -620,7 +614,7 @@ pub fn parse_css_item<'i, 't>(context: &mut ClassMap, input: &mut Parser<'i, 't>
             }
         }
         ref i => {
-            log::info!("Unexpected css: {:?}", i);
+            log::warn!("Unexpected css: {:?}", i);
             loop {
                 if input.is_exhausted() {
                     return Ok(());
@@ -635,10 +629,12 @@ pub fn parse_css_item<'i, 't>(context: &mut ClassMap, input: &mut Parser<'i, 't>
     Ok(())
 }
 
-pub fn parser_style_items<'i, 't>(input: &mut Parser<'i, 't>, arr: &mut VecDeque<Attribute>, scope_hash: usize) -> Result<(), ParseError<'i, ValueParseErrorKind<'i>>> {
+pub fn parser_style_items<'i, 't>(input: &mut Parser<'i, 't>, arr: &mut VecDeque<Attribute>, scope_hash: usize) {
     loop {
         if let Err(e) = parse_style_item(arr, scope_hash, input) {
-            log::error!("parse style error: {:?}", e);
+			if let ItemParseErrors::ValueError { .. } = e {
+				log::warn!("{}", e);
+			}
             end_cur_attr(input);
         } else {
             // 成功后，尝试解析一个或多个分号
@@ -648,16 +644,15 @@ pub fn parser_style_items<'i, 't>(input: &mut Parser<'i, 't>, arr: &mut VecDeque
             break;
         }
     }
-    return Ok(());
 }
 
 pub fn parse_key_frames<'i, 't>(
     input: &mut Parser<'i, 't>,
 	scope_hash: usize,
-) -> Result<XHashMap<NotNan<f32>, VecDeque<Attribute>>, ParseError<'i, ValueParseErrorKind<'i>>> {
+) -> Result<XHashMap<NotNan<f32>, VecDeque<Attribute>>, TokenParseError<'i>> {
     let mut key_frames: XHashMap<NotNan<f32>, VecDeque<Attribute>> = XHashMap::default();
     input.expect_curly_bracket_block()?;
-    input.parse_nested_block::<_, _, ValueParseErrorKind<'i>>(|i| {
+    Ok(input.parse_nested_block::<_, _, TokenErrorsInfo<'i>>(|i| {
         loop {
             match parse_key_frame(i, scope_hash) {
                 Ok((progress, attrs)) => {
@@ -680,17 +675,19 @@ pub fn parse_key_frames<'i, 't>(
             }
         }
         Ok(key_frames)
-    })
+    })?)
 }
 
-pub fn parse_key_frame<'i, 't>(input: &mut Parser<'i, 't>, scope_hash: usize) -> Result<(NotNan<f32>, VecDeque<Attribute>), ParseError<'i, ValueParseErrorKind<'i>>> {
+pub fn parse_key_frame<'i, 't>(input: &mut Parser<'i, 't>, scope_hash: usize) -> Result<(NotNan<f32>, VecDeque<Attribute>), TokenParseError<'i>> {
     let progress = parse_key_frame_progress(input)?;
     let mut attrs = VecDeque::default();
     input.expect_curly_bracket_block()?;
-    if let Err(r) = input.parse_nested_block::<_, _, ValueParseErrorKind<'i>>(|i| {
+    if let Err(r) = input.parse_nested_block::<_, _, TokenErrorsInfo<'i>>(|i| {
         loop {
             if let Err(e) = parse_style_item(&mut attrs,  scope_hash, i) {
-                log::error!("parse_key_frames style error: {:?}", e);
+				if let ItemParseErrors::ValueError { .. } = e {
+					log::warn!("{}", e);
+				}
                 end_cur_attr(i);
             } else {
                 // 成功后，尝试解析一个分号
@@ -720,7 +717,7 @@ pub fn end_cur_attr<'i, 't>(input: &mut Parser<'i, 't>) {
 }
 
 /// 解析KeyFrame进度
-pub fn parse_key_frame_progress<'i, 't>(input: &mut Parser<'i, 't>) -> Result<NotNan<f32>, ParseError<'i, ValueParseErrorKind<'i>>> {
+pub fn parse_key_frame_progress<'i, 't>(input: &mut Parser<'i, 't>) -> Result<NotNan<f32>, TokenParseError<'i>> {
     let location = input.current_source_location();
     let item = input.next()?;
     let r = match item {
@@ -730,16 +727,16 @@ pub fn parse_key_frame_progress<'i, 't>(input: &mut Parser<'i, 't>) -> Result<No
             } else if (&**r) == "to" {
                 1.0
             } else {
-                return Err(location.new_custom_error::<_, ValueParseErrorKind<'i>>(ValueParseErrorKind::InvalidKeyFrameProgress(item.clone())));
+                return Err(TokenParseError::from_expect(location, "from | to | <percentage>",item.clone()))?;
             }
         }
         Token::Percentage { unit_value, .. } => *unit_value,
-        _ => return Err(location.new_custom_error::<_, ValueParseErrorKind<'i>>(ValueParseErrorKind::InvalidKeyFrameProgress(item.clone()))),
+        _ => return Err(TokenParseError::from_expect(location, "from | to | <percentage>",item.clone()))?
     };
     Ok(unsafe { NotNan::new_unchecked(r) })
 }
 
-fn parse_border_image_slice<'i, 't>(input: &mut Parser<'i, 't>) -> Result<BorderImageSlice, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_border_image_slice<'i, 't>(input: &mut Parser<'i, 't>) -> Result<BorderImageSlice, TokenParseError<'i>> {
     let r = match input.try_parse(|input| input.expect_percentage()) {
         Ok(r1) => match input.try_parse(|input| input.expect_percentage()) {
             Ok(r2) => match input.try_parse(|input| input.expect_percentage()) {
@@ -782,7 +779,7 @@ fn parse_border_image_slice<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Border
 
 fn parse_top_right_bottom_left<'i, 't, T: StyleParse + Copy + Default>(
     input: &mut Parser<'i, 't>,
-) -> Result<Rect<T>, ParseError<'i, ValueParseErrorKind<'i>>> {
+) -> Result<Rect<T>, TokenParseError<'i>> {
     let r = match input.try_parse(|input| T::parse(input)) {
         Ok(r1) => match input.try_parse(|input| T::parse(input)) {
             Ok(r2) => match input.try_parse(|input| T::parse(input)) {
@@ -826,7 +823,7 @@ fn parse_top_right_bottom_left<'i, 't, T: StyleParse + Copy + Default>(
 
 pub fn parse_border_radius<'i, 't>(
     input: &mut Parser<'i, 't>,
-) -> Result<BorderRadius, ParseError<'i, ValueParseErrorKind<'i>>> {
+) -> Result<BorderRadius, TokenParseError<'i>> {
     let x = parse_top_right_bottom_left(input)?;
 	let y = input.next();
 	let y = if let Ok(&Token::Delim('/')) = y {
@@ -855,7 +852,7 @@ fn to_four<T: Clone + Copy>(
 	}
 }
 
-fn parse_enable<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Enable, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_enable<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Enable, TokenParseError<'i>> {
     match input.expect_ident()?.as_ref() {
         "auto" => Ok(Enable::Auto),
         "none" => Ok(Enable::None),
@@ -864,14 +861,14 @@ fn parse_enable<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Enable, ParseError
     }
 }
 
-fn parse_visibility<'i, 't>(input: &mut Parser<'i, 't>) -> Result<bool, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_visibility<'i, 't>(input: &mut Parser<'i, 't>) -> Result<bool, TokenParseError<'i>> {
     match input.expect_ident()?.as_ref() {
         "hidden" => Ok(false),
         _ => Ok(true),
     }
 }
 
-fn parse_display<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Display, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_display<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Display, TokenParseError<'i>> {
     match input.expect_ident()?.as_ref() {
         "flex" => Ok(Display::Flex),
         "none" => Ok(Display::None),
@@ -879,94 +876,100 @@ fn parse_display<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Display, ParseErr
     }
 }
 
-fn parse_overflow<'i, 't>(input: &mut Parser<'i, 't>) -> Result<bool, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_overflow<'i, 't>(input: &mut Parser<'i, 't>) -> Result<bool, TokenParseError<'i>> {
     match input.expect_ident()?.as_ref() {
         "hidden" => Ok(true),
         _ => Ok(false), // 默认情况
     }
 }
 
-fn pasre_white_space<'i, 't>(input: &mut Parser<'i, 't>) -> Result<WhiteSpace, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn pasre_white_space<'i, 't>(input: &mut Parser<'i, 't>) -> Result<WhiteSpace, TokenParseError<'i>> {
     let location = input.current_source_location();
-    let r = match input.expect_ident()?.as_ref() {
+	let ident = input.expect_ident()?;
+    let r = match ident.as_ref() {
         "normal" => WhiteSpace::Normal,
         "pre" => WhiteSpace::Pre,
         "nowrap" => WhiteSpace::Nowrap,
         "pre-wrap" => WhiteSpace::PreWrap,
         "pre-line" => WhiteSpace::PreLine,
-        _ => return Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+        _ => return Err(TokenParseError::from_expect(location, "normal | pre | nowrap | pre-wrap | pre-line", Token::Ident(ident.clone())))?,
     };
     Ok(r)
 }
 
-fn parse_blend_mode<'i, 't>(input: &mut Parser<'i, 't>) -> Result<BlendMode, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_blend_mode<'i, 't>(input: &mut Parser<'i, 't>) -> Result<BlendMode, TokenParseError<'i>> {
     let location = input.current_source_location();
-    let r = match input.expect_ident()?.as_ref() {
+    let ident = input.expect_ident()?;
+    let r = match ident.as_ref() {
         "normal" => BlendMode::Normal,
         "alpha-add" => BlendMode::AlphaAdd,
         "subtract" => BlendMode::Subtract,
         "multiply" => BlendMode::Multiply,
         "one-one" => BlendMode::OneOne,
-        _ => return Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+        _ => return Err(TokenParseError::from_expect(location, "normal | alpha-add | subtract | multiply | one-one", Token::Ident(ident.clone())))?,
     };
     Ok(r)
 }
 
-fn parse_font_weight<'i, 't>(input: &mut Parser<'i, 't>) -> Result<f32, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_font_weight<'i, 't>(input: &mut Parser<'i, 't>) -> Result<f32, TokenParseError<'i>> {
     let location = input.current_source_location();
-    let toke = input.next()?;
-    let r = match toke {
+    let token = input.next()?;
+    let r = match token {
         Token::Ident(r) => match r.as_ref() {
             "bold" => 700.0,
-            _ => return Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+            _ => return Err(TokenParseError::from_expect(location, "bold | <number>", token.clone()))?,
         },
         Token::Number { value, .. } => *value,
-        _ => return Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+        _ => return Err(TokenParseError::from_expect(location, "bold | <number>", token.clone()))?,
     };
     Ok(r)
 }
 
-fn parse_text_align<'i, 't>(input: &mut Parser<'i, 't>) -> Result<TextAlign, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_text_align<'i, 't>(input: &mut Parser<'i, 't>) -> Result<TextAlign, TokenParseError<'i>> {
     let location = input.current_source_location();
-    let r = match input.expect_ident()?.as_ref() {
+    let ident = input.expect_ident()?;
+    let r = match ident.as_ref() {
         "left" => Ok(TextAlign::Left),
         "right" => Ok(TextAlign::Right),
         "center" => Ok(TextAlign::Center),
         "justify" => Ok(TextAlign::Justify),
-        _ => return Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+		_ => return Err(TokenParseError::from_expect(location, "left | right | center | justify", Token::Ident(ident.clone())))?,
     };
     r
 }
 
-fn parse_yg_align_items<'i, 't>(input: &mut Parser<'i, 't>) -> Result<AlignItems, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_yg_align_items<'i, 't>(input: &mut Parser<'i, 't>) -> Result<AlignItems, TokenParseError<'i>> {
     let location = input.current_source_location();
-    match input.expect_ident()?.as_ref() {
+    let ident = input.expect_ident()?;
+    match ident.as_ref() {
         // "auto" => Ok(AlignItems::Auto),
         "flex-start" => Ok(AlignItems::FlexStart),
         "center" => Ok(AlignItems::Center),
         "flex-end" => Ok(AlignItems::FlexEnd),
         "stretch" => Ok(AlignItems::Stretch),
         "baseline" => Ok(AlignItems::Baseline),
-        _ => Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+		_ => return Err(TokenParseError::from_expect(location, "flex-start | center | flex-end | stretch | baseline", Token::Ident(ident.clone())))?,
     }
 }
 
-fn parse_yg_align_self<'i, 't>(input: &mut Parser<'i, 't>) -> Result<AlignSelf, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_yg_align_self<'i, 't>(input: &mut Parser<'i, 't>) -> Result<AlignSelf, TokenParseError<'i>> {
     let location = input.current_source_location();
-    match input.expect_ident()?.as_ref() {
+    let ident = input.expect_ident()?;
+    match ident.as_ref() {
         // "auto" => Ok(AlignItems::Auto),
         "flex-start" => Ok(AlignSelf::FlexStart),
         "center" => Ok(AlignSelf::Center),
         "flex-end" => Ok(AlignSelf::FlexEnd),
         "stretch" => Ok(AlignSelf::Stretch),
         "baseline" => Ok(AlignSelf::Baseline),
-        _ => Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+        _ => return Err(TokenParseError::from_expect(location, "flex-start | center | flex-end | stretch | baseline", Token::Ident(ident.clone())))?,
     }
 }
 
-fn parse_yg_align_content<'i, 't>(input: &mut Parser<'i, 't>) -> Result<AlignContent, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_yg_align_content<'i, 't>(input: &mut Parser<'i, 't>) -> Result<AlignContent, TokenParseError<'i>> {
     let location = input.current_source_location();
-    match input.expect_ident()?.as_ref() {
+	let ident = input.expect_ident()?;
+    match ident.as_ref() {
         // "auto" => Ok(AlignItems::Auto),
         "flex-start" => Ok(AlignContent::FlexStart),
         "center" => Ok(AlignContent::Center),
@@ -974,90 +977,92 @@ fn parse_yg_align_content<'i, 't>(input: &mut Parser<'i, 't>) -> Result<AlignCon
         "stretch" => Ok(AlignContent::Stretch),
         "space-between" => Ok(AlignContent::SpaceBetween),
         "space-around" => Ok(AlignContent::SpaceAround),
-        _ => Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+        _ => return Err(TokenParseError::from_expect(location, "flex-start | center | flex-end | stretch | space-between | space-around", Token::Ident(ident.clone())))?,
     }
 }
 
-fn parse_yg_direction<'i, 't>(input: &mut Parser<'i, 't>) -> Result<FlexDirection, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_yg_direction<'i, 't>(input: &mut Parser<'i, 't>) -> Result<FlexDirection, TokenParseError<'i>> {
     let location = input.current_source_location();
-    match input.expect_ident()?.as_ref() {
+	let ident = input.expect_ident()?;
+    match ident.as_ref() {
         "column" => Ok(FlexDirection::Column),
         "column-reverse" => Ok(FlexDirection::ColumnReverse),
         "row" => Ok(FlexDirection::Row),
         "row-reverse" => Ok(FlexDirection::RowReverse),
-        _ => Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+        _ => return Err(TokenParseError::from_expect(location, "column | column-reverse | row | row-reverse", Token::Ident(ident.clone())))?,
     }
 }
 
-fn parse_yg_justify_content<'i, 't>(input: &mut Parser<'i, 't>) -> Result<JustifyContent, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_yg_justify_content<'i, 't>(input: &mut Parser<'i, 't>) -> Result<JustifyContent, TokenParseError<'i>> {
     let location = input.current_source_location();
-    match input.expect_ident()?.as_ref() {
+	let ident = input.expect_ident()?;
+    match ident.as_ref() {
         "flex-start" => Ok(JustifyContent::FlexStart),
         "center" => Ok(JustifyContent::Center),
         "flex-end" => Ok(JustifyContent::FlexEnd),
         "space-between" => Ok(JustifyContent::SpaceBetween),
         "space-around" => Ok(JustifyContent::SpaceAround),
-        _ => Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+        _ => return Err(TokenParseError::from_expect(location, "flex-start | center | flex-end | space-between | space-around", Token::Ident(ident.clone())))?,
     }
 }
 
-fn parse_yg_position_type<'i, 't>(input: &mut Parser<'i, 't>) -> Result<PositionType, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_yg_position_type<'i, 't>(input: &mut Parser<'i, 't>) -> Result<PositionType, TokenParseError<'i>> {
     let location = input.current_source_location();
-    match input.expect_ident()?.as_ref() {
+	let ident = input.expect_ident()?;
+    match ident.as_ref() {
         "relative" => Ok(PositionType::Relative),
         "absolute" => Ok(PositionType::Absolute),
-        _ => Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+        _ => return Err(TokenParseError::from_expect(location, "relative | absolute", Token::Ident(ident.clone())))?,
     }
 }
 
-fn parse_yg_wrap<'i, 't>(input: &mut Parser<'i, 't>) -> Result<FlexWrap, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_yg_wrap<'i, 't>(input: &mut Parser<'i, 't>) -> Result<FlexWrap, TokenParseError<'i>> {
     let location = input.current_source_location();
-    match input.expect_ident()?.as_ref() {
+	let ident = input.expect_ident()?;
+    match ident.as_ref() {
         "nowrap" => Ok(FlexWrap::NoWrap),
         "wrap" => Ok(FlexWrap::Wrap),
         "wrap-reverse" => Ok(FlexWrap::WrapReverse),
-        _ => Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+        _ => return Err(TokenParseError::from_expect(location, "nowrap | wrap | wrap-reverse", Token::Ident(ident.clone())))?,
     }
 }
 
-fn parse_line_height<'i, 't>(input: &mut Parser<'i, 't>) -> Result<LineHeight, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_line_height<'i, 't>(input: &mut Parser<'i, 't>) -> Result<LineHeight, TokenParseError<'i>> {
     let location = input.current_source_location();
-    let toke = input.next()?;
-    match toke {
-        Token::Ident(r) => match r.as_ref() {
-            "normal" => Ok(LineHeight::Normal),
-            _ => Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
-        },
+    let token = input.next()?;
+    match token {
+        Token::Ident(r) if r.as_ref() == "normal" => Ok(LineHeight::Normal),
         Token::Percentage { unit_value, .. } => Ok(LineHeight::Percent(*unit_value)),
         Token::Dimension { value, .. } => Ok(LineHeight::Length(*value)),
         Token::Number { value, .. } => Ok(LineHeight::Length(*value)),
-        _ => Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+        _ => return Err(TokenParseError::from_expect(location, "normal | <percentage> | <length>", token.clone()))?,
     }
 }
 
-fn parse_font_size<'i, 't>(input: &mut Parser<'i, 't>) -> Result<FontSize, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_font_size<'i, 't>(input: &mut Parser<'i, 't>) -> Result<FontSize, TokenParseError<'i>> {
     let location = input.current_source_location();
-    let toke = input.next()?;
-    match toke {
+    let token = input.next()?;
+    match token {
         Token::Percentage { unit_value, .. } => Ok(FontSize::Percent(*unit_value)),
         Token::Dimension { value, .. } => Ok(FontSize::Length(*value as usize)),
         Token::Number { value, .. } => Ok(FontSize::Length(*value as usize)),
-        _ => Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+        _ => return Err(TokenParseError::from_expect(location, "<percentage> | <length>", token.clone()))?,
     }
 }
 
-fn parse_text_stroke<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Stroke, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_text_stroke<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Stroke, TokenParseError<'i>> {
     let location = input.current_source_location();
+	let w: f32 = parse_len(input)?;
     Ok(Stroke {
-        width: match NotNan::new(parse_len(input)?) {
+        width: match NotNan::new(w) {
             Ok(r) => r,
-            Err(_) => return Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+            Err(_) => return Err(TokenParseError::from_expect(location, "<length>",  Token::Number { value: w, has_sign: false, int_value: None}))?,
         },
         color: parse_color(input)?,
     })
 }
 
-fn parse_transform_origin<'i, 't>(input: &mut Parser<'i, 't>) -> Result<TransformOrigin, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_transform_origin<'i, 't>(input: &mut Parser<'i, 't>) -> Result<TransformOrigin, TokenParseError<'i>> {
     let x = parse_transform_origin1(input)?;
     Ok(TransformOrigin::XY(
         x,
@@ -1068,37 +1073,35 @@ fn parse_transform_origin<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Transfor
     ))
 }
 
-fn parse_transform_origin1<'i, 't>(input: &mut Parser<'i, 't>) -> Result<LengthUnit, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_transform_origin1<'i, 't>(input: &mut Parser<'i, 't>) -> Result<LengthUnit, TokenParseError<'i>> {
     let location = input.current_source_location();
-    let toke = input.next()?;
-    match toke {
-        Token::Ident(r) => match r.as_ref() {
-            "center" => Ok(LengthUnit::Percent(0.5)),
-            _ => return Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
-        },
+    let token = input.next()?;
+    match token {
+        Token::Ident(r) if r.as_ref() == "center" => Ok(LengthUnit::Percent(0.5)),
         Token::Percentage { unit_value, .. } => Ok(LengthUnit::Percent(*unit_value)),
         Token::Dimension { value, .. } => Ok(LengthUnit::Pixel(*value)),
         Token::Number { value, .. } => Ok(LengthUnit::Pixel(*value)),
-        _ => Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+        _ => return Err(TokenParseError::from_expect(location, "center | <length> |<percentage> ",  token.clone()))?,
     }
 }
 
-pub fn parse_len_or_percent<'i, 't>(input: &mut Parser<'i, 't>) -> Result<LengthUnit, ParseError<'i, ValueParseErrorKind<'i>>> {
+pub fn parse_len_or_percent<'i, 't>(input: &mut Parser<'i, 't>) -> Result<LengthUnit, TokenParseError<'i>> {
     let location = input.current_source_location();
-    let toke = input.next()?;
-    match toke {
+    let token = input.next()?;
+    match token {
         Token::Percentage { unit_value, .. } => Ok(LengthUnit::Percent(*unit_value)),
         Token::Dimension { value, .. } => Ok(LengthUnit::Pixel(*value)),
         Token::Number { value, .. } => Ok(LengthUnit::Pixel(*value)),
-        _ => Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+        _ => return Err(TokenParseError::from_expect(location, "<length> |<percentage> ",  token.clone()))?,
     }
 }
 
-fn parse_transform<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Vec<TransformFunc>, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_transform<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Vec<TransformFunc>, TokenParseError<'i>> {
     let mut transforms = Vec::default();
-    let location = input.current_source_location();
+	let error;
     loop {
-        if let Ok(r) = input.try_parse(|input| {
+		
+        let r= input.try_parse(|input| {
             let location = input.current_source_location();
             let f = input.expect_function()?;
             match f.as_ref() {
@@ -1120,7 +1123,7 @@ fn parse_transform<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Vec<TransformFu
                     match (x, y) {
                         (LengthUnit::Percent(x), LengthUnit::Percent(y)) => Ok(TransformFunc::TranslatePercent(x, y)),
                         (LengthUnit::Pixel(x), LengthUnit::Pixel(y)) => Ok(TransformFunc::Translate(x, y)),
-                        _ => Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+                        (x, y) => return Err(TokenParseError::from_message(location, format!("expect: <length> <length> |<percentage> <percentage>, find: {:?}, {:?}", x, y)))?,
                     }
                 }),
                 "translateX" => input.parse_nested_block(|input| match parse_len_or_percent(input)? {
@@ -1134,22 +1137,25 @@ fn parse_transform<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Vec<TransformFu
                 "rotate" | "rotateZ" => input.parse_nested_block(|input| Ok(TransformFunc::RotateZ(parse_angle(input)?))),
                 "skewX" => input.parse_nested_block(|input| Ok(TransformFunc::SkewX(parse_angle(input)?))),
                 "skewY" => input.parse_nested_block(|input| Ok(TransformFunc::SkewY(parse_angle(input)?))),
-                _ => Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+                _ => return Err(TokenParseError::from_expect(location, "scale | scaleX | scaleY | translate | translateX | translateY | rotateZ | skewX | skewY", Token::Ident(f.clone())))?,
             }
-        }) {
-            transforms.push(r);
-        } else {
-            break;
-        }
+        });
+		match r {
+			Ok(r) => transforms.push(r),
+			Err(r) => {
+				error = r;
+				break;
+			},
+        };
     }
     if transforms.len() > 0 {
         Ok(transforms)
     } else {
-        Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter))
+		Err(error)?
     }
 }
 
-fn parse_object_fit<'i, 't>(input: &mut Parser<'i, 't>) -> Result<FitType, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_object_fit<'i, 't>(input: &mut Parser<'i, 't>) -> Result<FitType, TokenParseError<'i>> {
     let location = input.current_source_location();
     let item = input.expect_ident()?;
     let r = match item.as_ref() {
@@ -1158,12 +1164,12 @@ fn parse_object_fit<'i, 't>(input: &mut Parser<'i, 't>) -> Result<FitType, Parse
         "fill" => FitType::Fill,
         "none" => FitType::None,
         "scale-down" => FitType::ScaleDown,
-        _ => return Err(location.new_custom_error(ValueParseErrorKind::InvalidObjectFit(Token::Ident(item.clone())))),
+        _ => return Err(TokenParseError::from_expect(location, "contain | cover | fill | none | scale-down", Token::Ident(item.clone())))?,
     };
     Ok(r)
 }
 
-fn parse_image_repeat<'i, 't>(input: &mut Parser<'i, 't>) -> Result<ImageRepeat, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_image_repeat<'i, 't>(input: &mut Parser<'i, 't>) -> Result<ImageRepeat, TokenParseError<'i>> {
     let location = input.current_source_location();
     let item = input.expect_ident()?;
     let mut r = match item.as_ref() {
@@ -1195,10 +1201,10 @@ fn parse_image_repeat<'i, 't>(input: &mut Parser<'i, 't>) -> Result<ImageRepeat,
             x: ImageRepeatOption::Repeat,
             y: ImageRepeatOption::Repeat,
         },
-        _ => return Err(location.new_custom_error(ValueParseErrorKind::InvalidRepeat(Token::Ident(item.clone())))),
+        _ => return Err(TokenParseError::from_expect(location, "no-repeat | repeat-x | repeat-y | space | round | repeat", Token::Ident(item.clone())))?,
     };
 
-    let _ = input.try_parse::<_, _, ParseError<ValueParseErrorKind<'i>>>(|input| {
+    let _ = input.try_parse::<_, _, ParseError<TokenErrorsInfo<'i>>>(|input| {
         let location = input.current_source_location();
         let item = input.expect_ident()?;
         match item.as_ref() {
@@ -1206,7 +1212,7 @@ fn parse_image_repeat<'i, 't>(input: &mut Parser<'i, 't>) -> Result<ImageRepeat,
             "space" => r.y = ImageRepeatOption::Space,
             "round" => r.y = ImageRepeatOption::Round,
             "repeat" => r.y = ImageRepeatOption::Repeat,
-            _ => return Err(location.new_custom_error(ValueParseErrorKind::InvalidRepeat(Token::Ident(item.clone())))),
+            _ => return Err(TokenParseError::from_expect(location, "no-repeat | space | round | repeat", Token::Ident(item.clone())))?,
         }
         Ok(())
     });
@@ -1214,7 +1220,7 @@ fn parse_image_repeat<'i, 't>(input: &mut Parser<'i, 't>) -> Result<ImageRepeat,
     Ok(r)
 }
 
-fn parse_color_hex(value: &str) -> Result<CgColor, String> {
+fn parse_color_hex(value: &str) -> Result<CgColor, ()> {
     let value = value.as_bytes();
     match value.len() {
         8 => Ok(rgba(
@@ -1236,19 +1242,19 @@ fn parse_color_hex(value: &str) -> Result<CgColor, String> {
             (from_hex(value[3])? * 17) as f32 / 255.0,
         )),
         3 => Ok(rgba(from_hex(value[0])? * 17, from_hex(value[1])? * 17, from_hex(value[2])? * 17, 1.0)),
-        _ => Err("".to_string()),
+        _ => Err(()),
     }
 }
 
 fn rgba(red: u8, green: u8, blue: u8, alpha: f32) -> CgColor { CgColor::new(red as f32 / 255.0, green as f32 / 255.0, blue as f32 / 255.0, alpha) }
 
-fn parser_color_stop_last(
+fn parser_color_stop_last<'i>(
     v: f32,
     list: &mut Vec<CgColor>,
     color_stop: &mut Vec<ColorAndPosition>,
     pre_percent: &mut f32,
     last_color: Option<CgColor>,
-) -> Result<(), String> {
+) -> Result<(), TokenParseError<'i>> {
     if list.len() > 0 {
         if color_stop.len() != 0 {
             let pos = (v - *pre_percent) / list.len() as f32;
@@ -1284,12 +1290,12 @@ fn parser_color_stop_last(
     Ok(())
 }
 
-fn from_hex(c: u8) -> Result<u8, String> {
+fn from_hex(c: u8) -> Result<u8, ()> {
     match c {
         b'0'..=b'9' => Ok(c - b'0'),
         b'a'..=b'f' => Ok(c - b'a' + 10),
         b'A'..=b'F' => Ok(c - b'A' + 10),
-        _ => Err("".to_string()),
+        _ => Err(()),
     }
 }
 
@@ -1321,14 +1327,26 @@ fn trans_hsi_i(mut i: f32) -> f32 {
 }
 
 
-pub fn parse_style_item<'i, 't>(buffer: &mut VecDeque<Attribute>, scope_hash: usize, input: &mut Parser<'i, 't>) -> Result<(), ParseError<'i, ValueParseErrorKind<'i>>> {
+pub fn parse_style_item<'i, 't>(buffer: &mut VecDeque<Attribute>, scope_hash: usize, input: &mut Parser<'i, 't>) -> Result<(), ItemParseErrors<'i>> {
     let location = input.current_source_location();
-    let key = match input.next()? {
+	let key_token = input.next()?;
+	let name = match key_token {
         Token::Semicolon => return Ok(()), // 如果是分号，直接结束本次匹配
-        Token::Ident(r) => r,
-        token => return Err(location.new_unexpected_token_error(token.clone())),
+        Token::Ident(r) => r.clone(),
+        _ => return Err(ItemParseErrors::KeyError { location: location, kind: BasicParseErrorKind::UnexpectedToken(key_token.clone()) }),
     };
-    match key.as_ref() {
+    
+	 match parse_style_item_value(location, name.clone(), buffer, scope_hash, input) {
+		Ok(_) => Ok(()),
+		Err(e) => match e.error {
+			TokenErrorsInfo::KeyError => Err(ItemParseErrors::KeyError { location, kind: BasicParseErrorKind::UnexpectedToken(Token::Ident(name)) }),
+			_ => Err(ItemParseErrors::ValueError { attribute: name.clone(), error: e }),
+		},
+	}
+}
+
+pub fn parse_style_item_value<'i, 't>(location: SourceLocation, name: CowRcStr<'i>, buffer: &mut VecDeque<Attribute>, scope_hash: usize, input: &mut Parser<'i, 't>) -> Result<(), TokenParseError<'i>> {
+    match name.as_ref() {
         "filter" => {
             input.expect_colon()?;
             parse_filter1(buffer, input)?;
@@ -1336,26 +1354,26 @@ pub fn parse_style_item<'i, 't>(buffer: &mut VecDeque<Attribute>, scope_hash: us
         "background-color" => {
             input.expect_colon()?;
             let ty = BackgroundColorType(Color::RGBA(parse_color(input)?));
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::BackgroundColor(ty));
         }
         "background" => {
             input.expect_colon()?;
             let ty = BackgroundColorType(parse_background(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::BackgroundColor(ty));
         }
 
         "border-color" => {
             input.expect_colon()?;
             let ty = BorderColorType(parse_color(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::BorderColor(ty));
         }
         "box-shadow" => {
             input.expect_colon()?;
             let ty = BoxShadowType(parse_box_shadow(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::BoxShadow(ty));
         }
 
@@ -1364,12 +1382,12 @@ pub fn parse_style_item<'i, 't>(buffer: &mut VecDeque<Attribute>, scope_hash: us
             match parse_gradient_image(input)? {
                 GradientImage::Linear(gradient) => {
                     let ty = BackgroundColorType(Color::LinearGradient(gradient));
-                    log::debug!("{:?}", ty);
+                    log::trace!("{:?}", ty);
                     buffer.push_back(Attribute::BackgroundColor(ty));
                 }
                 GradientImage::Url(image) => {
                     let ty = BackgroundImageType(Atom::from(image.as_ref().to_string()));
-                    log::debug!("{:?}", ty);
+                    log::trace!("{:?}", ty);
                     buffer.push_back(Attribute::BackgroundImage(ty));
                 }
             }
@@ -1377,45 +1395,45 @@ pub fn parse_style_item<'i, 't>(buffer: &mut VecDeque<Attribute>, scope_hash: us
         "image-clip" | "background-image-clip" => unsafe {
             input.expect_colon()?;
             let ty = BackgroundImageClipType(transmute::<_, NotNanRect>(parse_top_right_bottom_left::<Percentage>(input)?));
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::BackgroundImageClip(ty));
         },
         "object-fit" => {
             input.expect_colon()?;
             let ty = ObjectFitType(parse_object_fit(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::ObjectFit(ty));
         }
         "background-repeat" => {
             input.expect_colon()?;
             let ty = BackgroundRepeatType(parse_image_repeat(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::BackgroundRepeat(ty));
         }
 
         "border-image" => {
             input.expect_colon()?;
             let ty = BorderImageType(Atom::from(input.expect_url()?.as_ref().to_string()));
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::BorderImage(ty));
         }
         "border-image-clip" => unsafe {
             input.expect_colon()?;
             let ty = BorderImageClipType(transmute::<_, NotNanRect>(parse_top_right_bottom_left::<Percentage>(input)?));
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::BorderImageClip(ty));
         },
         "border-image-slice" => {
             input.expect_colon()?;
             let ty = BorderImageSliceType(parse_border_image_slice(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::BorderImageSlice(ty));
         }
         "border-image-repeat" => {
             input.expect_colon()?;
             let repeat = parse_image_repeat(input)?;
             let ty = BorderImageRepeatType(repeat);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::BorderImageRepeat(ty));
         }
         "mask-image" => {
@@ -1423,12 +1441,12 @@ pub fn parse_style_item<'i, 't>(buffer: &mut VecDeque<Attribute>, scope_hash: us
             match parse_gradient_image(input)? {
                 GradientImage::Linear(gradient) => {
                     let ty = MaskImageType(MaskImage::LinearGradient(gradient));
-                    log::debug!("{:?}", ty);
+                    log::trace!("{:?}", ty);
                     buffer.push_back(Attribute::MaskImage(ty));
                 }
                 GradientImage::Url(image) => {
                     let ty = MaskImageType(MaskImage::Path(Atom::from(image.as_ref().to_string())));
-                    log::debug!("{:?}", ty);
+                    log::trace!("{:?}", ty);
                     buffer.push_back(Attribute::MaskImage(ty));
                 }
             }
@@ -1436,75 +1454,75 @@ pub fn parse_style_item<'i, 't>(buffer: &mut VecDeque<Attribute>, scope_hash: us
         "mask-image-clip" => unsafe {
             input.expect_colon()?;
             let ty = MaskImageClipType(transmute::<_, NotNanRect>(parse_top_right_bottom_left::<Percentage>(input)?));
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::MaskImageClip(ty));
         },
         "blend-mode" => {
             input.expect_colon()?;
             let ty = BlendModeType(parse_blend_mode(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::BlendMode(ty));
         }
         "text-gradient" => {
             input.expect_colon()?;
             let ty = ColorType(parse_background(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::Color(ty));
         }
         "color" => {
             input.expect_colon()?;
             let ty = ColorType(Color::RGBA(parse_color(input)?));
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::Color(ty));
         }
         "letter-spacing" => {
             input.expect_colon()?;
             let ty = LetterSpacingType(parse_len(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::LetterSpacing(ty));
         }
         "line-height" => {
             input.expect_colon()?;
             let ty = LineHeightType(parse_line_height(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::LineHeight(ty));
         }
         "text-align" => {
             input.expect_colon()?;
             let ty = TextAlignType(parse_text_align(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::TextAlign(ty));
         }
         "text-indent" => {
             input.expect_colon()?;
             let ty = TextIndentType(parse_len(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::TextIndent(ty));
         }
         "text-shadow" => {
             input.expect_colon()?;
             let ty = TextShadowType(parse_text_shadow(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::TextShadow(ty));
         }
         // "vertical-align" => show_attr.push(Attribute::Color( Color::RGBA(parse_color_string(value)?) )),
         "white-space" => {
             input.expect_colon()?;
             let ty = WhiteSpaceType(pasre_white_space(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::WhiteSpace(ty));
         }
         "word-spacing" => {
             input.expect_colon()?;
             let ty = WordSpacingType(parse_len(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::WordSpacing(ty));
         }
 
         "text-stroke" => {
             input.expect_colon()?;
             let ty = TextStrokeType(parse_text_stroke(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::TextStroke(ty));
         }
 
@@ -1512,146 +1530,146 @@ pub fn parse_style_item<'i, 't>(buffer: &mut VecDeque<Attribute>, scope_hash: us
         "font-weight" => {
             input.expect_colon()?;
             let ty = FontWeightType(parse_font_weight(input)? as usize);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::FontWeight(ty));
         }
         "font-size" => {
             input.expect_colon()?;
             let ty = FontSizeType(parse_font_size(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::FontSize(ty));
         }
         "font-family" => {
             input.expect_colon()?;
             let ty = FontFamilyType(Atom::from(input.expect_ident()?.as_ref().to_string()));
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::FontFamily(ty));
         }
 
         "border-radius" => {
             input.expect_colon()?;
             let ty = BorderRadiusType(parse_border_radius(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::BorderRadius(ty));
         }
         "opacity" => {
             input.expect_colon()?;
             let ty = OpacityType(input.expect_number()?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::Opacity(ty));
         }
         "transform" => {
             input.expect_colon()?;
             let ty = TransformType(parse_transform(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::Transform(ty));
         }
         "transform-origin" => {
             input.expect_colon()?;
             let ty = TransformOriginType(parse_transform_origin(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::TransformOrigin(ty));
         }
         "z-index" => {
             input.expect_colon()?;
             let ty = ZIndexType(input.expect_number()? as isize);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::ZIndex(ty));
         }
         "visibility" => {
             input.expect_colon()?;
             let ty = VisibilityType(parse_visibility(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::Visibility(ty));
         }
         "pointer-events" => {
             input.expect_colon()?;
             let ty = EnableType(parse_enable(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::Enable(ty));
         }
         "display" => {
             input.expect_colon()?;
             let ty = DisplayType(parse_display(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::Display(ty));
         }
         "overflow" => {
             input.expect_colon()?;
             let ty = OverflowType(parse_overflow(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::Overflow(ty));
         }
         "overflow-y" => {
             input.expect_colon()?;
             let ty = OverflowType(parse_overflow(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::Overflow(ty));
         }
         "width" => {
             input.expect_colon()?;
             let ty = WidthType(Dimension::parse(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::Width(ty));
         }
         "height" => {
             input.expect_colon()?;
             let ty = HeightType(Dimension::parse(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::Height(ty));
         }
         "left" => {
             input.expect_colon()?;
             let ty = PositionLeftType(Dimension::parse(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::PositionLeft(ty));
         }
         "bottom" => {
             input.expect_colon()?;
             let ty = PositionBottomType(Dimension::parse(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::PositionBottom(ty));
         }
         "right" => {
             input.expect_colon()?;
             let ty = PositionRightType(Dimension::parse(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::PositionRight(ty));
         }
         "top" => {
             input.expect_colon()?;
             let ty = PositionTopType(Dimension::parse(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::PositionTop(ty));
         }
         "margin-left" => {
             input.expect_colon()?;
             let ty = MarginLeftType(Dimension::parse(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::MarginLeft(ty));
         }
         "margin-bottom" => {
             input.expect_colon()?;
             let ty = MarginBottomType(Dimension::parse(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::MarginBottom(ty));
         }
         "margin-right" => {
             input.expect_colon()?;
             let ty = MarginRightType(Dimension::parse(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::MarginRight(ty));
         }
         "margin-top" => {
             input.expect_colon()?;
             let ty = MarginTopType(Dimension::parse(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::MarginTop(ty));
         }
         "margin" => {
             input.expect_colon()?;
             let ty = parse_top_right_bottom_left(input)?;
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::MarginTop(MarginTopType(ty.top)));
             buffer.push_back(Attribute::MarginRight(MarginRightType(ty.right)));
             buffer.push_back(Attribute::MarginBottom(MarginBottomType(ty.bottom)));
@@ -1660,31 +1678,31 @@ pub fn parse_style_item<'i, 't>(buffer: &mut VecDeque<Attribute>, scope_hash: us
         "padding-left" => {
             input.expect_colon()?;
             let ty = PaddingLeftType(Dimension::parse(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::PaddingLeft(ty));
         }
         "padding-bottom" => {
             input.expect_colon()?;
             let ty = PaddingBottomType(Dimension::parse(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::PaddingBottom(ty));
         }
         "padding-right" => {
             input.expect_colon()?;
             let ty = PaddingRightType(Dimension::parse(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::PaddingRight(ty));
         }
         "padding-top" => {
             input.expect_colon()?;
             let ty = PaddingTopType(Dimension::parse(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::PaddingTop(ty));
         }
         "padding" => {
             input.expect_colon()?;
             let ty = parse_top_right_bottom_left(input)?;
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::PaddingTop(PaddingTopType(ty.top)));
             buffer.push_back(Attribute::PaddingRight(PaddingRightType(ty.right)));
             buffer.push_back(Attribute::PaddingBottom(PaddingBottomType(ty.bottom)));
@@ -1693,31 +1711,31 @@ pub fn parse_style_item<'i, 't>(buffer: &mut VecDeque<Attribute>, scope_hash: us
         "border-left" => {
             input.expect_colon()?;
             let ty = BorderLeftType(Dimension::parse(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::BorderLeft(ty));
         }
         "border-bottom" => {
             input.expect_colon()?;
             let ty = BorderBottomType(Dimension::parse(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::BorderBottom(ty));
         }
         "border-right" => {
             input.expect_colon()?;
             let ty = BorderRightType(Dimension::parse(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::BorderRight(ty));
         }
         "border-top" => {
             input.expect_colon()?;
             let ty = BorderTopType(Dimension::parse(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::BorderTop(ty));
         }
         "border" => {
             input.expect_colon()?;
             let ty = parse_top_right_bottom_left(input)?;
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::BorderTop(BorderTopType(ty.top)));
             buffer.push_back(Attribute::BorderRight(BorderRightType(ty.right)));
             buffer.push_back(Attribute::BorderBottom(BorderBottomType(ty.bottom)));
@@ -1726,7 +1744,7 @@ pub fn parse_style_item<'i, 't>(buffer: &mut VecDeque<Attribute>, scope_hash: us
         "border-width" => {
             input.expect_colon()?;
             let ty = parse_top_right_bottom_left(input)?;
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::BorderTop(BorderTopType(ty.top)));
             buffer.push_back(Attribute::BorderRight(BorderRightType(ty.right)));
             buffer.push_back(Attribute::BorderBottom(BorderBottomType(ty.bottom)));
@@ -1735,140 +1753,140 @@ pub fn parse_style_item<'i, 't>(buffer: &mut VecDeque<Attribute>, scope_hash: us
         "min-width" => {
             input.expect_colon()?;
             let ty = MinWidthType(Dimension::parse(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::MinWidth(ty));
         }
         "min-height" => {
             input.expect_colon()?;
             let ty = MinHeightType(Dimension::parse(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::MinHeight(ty));
         }
         "max-width" => {
             input.expect_colon()?;
             let ty = MaxWidthType(Dimension::parse(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::MaxWidth(ty));
         }
         "max-height" => {
             input.expect_colon()?;
             let ty = MaxHeightType(Dimension::parse(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::MaxHeight(ty));
         }
         "flex-basis" => {
             input.expect_colon()?;
             let ty = FlexBasisType(Dimension::parse(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::FlexBasis(ty));
         }
         "flex-shrink" => {
             input.expect_colon()?;
             let ty = FlexShrinkType(input.expect_number()?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::FlexShrink(ty));
         }
         "flex-grow" => {
             input.expect_colon()?;
             let ty = FlexGrowType(input.expect_number()?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::FlexGrow(ty));
         }
         "position" => {
             input.expect_colon()?;
             let ty = PositionTypeType(parse_yg_position_type(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::PositionType(ty));
         }
         "flex-wrap" => {
             input.expect_colon()?;
             let ty = FlexWrapType(parse_yg_wrap(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::FlexWrap(ty));
         }
         "flex-direction" => {
             input.expect_colon()?;
             let ty = FlexDirectionType(parse_yg_direction(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::FlexDirection(ty));
         }
         "align-content" => {
             input.expect_colon()?;
             let ty = AlignContentType(parse_yg_align_content(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::AlignContent(ty));
         }
         "align-items" => {
             input.expect_colon()?;
             let ty = AlignItemsType(parse_yg_align_items(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::AlignItems(ty));
         }
         "align-self" => {
             input.expect_colon()?;
             let ty = AlignSelfType(parse_yg_align_self(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::AlignSelf(ty));
         }
         "justify-content" => {
             input.expect_colon()?;
             let ty = JustifyContentType(parse_yg_justify_content(input)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::JustifyContent(ty));
         }
         "animation-name" => {
             input.expect_colon()?;
-            let ty = AnimationNameType(AnimationName{ scope_hash, value: parse_comma_separated(input, |input| Ok(Atom::from(input.expect_ident()?.as_ref())))?});
-            log::debug!("{:?}", ty);
+            let ty = AnimationNameType(AnimationName{ scope_hash, value: parse_comma_separated::<_, _, BasicParseError<'i>>(input, |input| Ok(Atom::from(input.expect_ident()?.as_ref())))?});
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::AnimationName(ty));
         }
         "animation-duration" => {
             input.expect_colon()?;
             let ty = AnimationDurationType(parse_comma_separated(input, Time::parse)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::AnimationDuration(ty));
         }
         "animation-timing-function" => {
             input.expect_colon()?;
             let ty = AnimationTimingFunctionType(parse_comma_separated(input, AnimationTimingFunction::parse)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::AnimationTimingFunction(ty));
         }
         "animation-delay" => {
             input.expect_colon()?;
             let ty = AnimationDelayType(parse_comma_separated(input, Time::parse)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::AnimationDelay(ty));
         }
         "animation-iteration-count" => {
             input.expect_colon()?;
             let ty = AnimationIterationCountType(parse_comma_separated(input, IterationCount::parse)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::AnimationIterationCount(ty));
         }
         "animation-direction" => {
             input.expect_colon()?;
             let ty = AnimationDirectionType(parse_comma_separated(input, AnimationDirection::parse)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::AnimationDirection(ty));
         }
         "animation-fill-mode" => {
             input.expect_colon()?;
             let ty = AnimationFillModeType(parse_comma_separated(input, AnimationFillMode::parse)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::AnimationFillMode(ty));
         }
         "animation-play-state" => {
             input.expect_colon()?;
             let ty = AnimationPlayStateType(parse_comma_separated(input, AnimationPlayState::parse)?);
-            log::debug!("{:?}", ty);
+            log::trace!("{:?}", ty);
             buffer.push_back(Attribute::AnimationPlayState(ty));
         }
         "animation" => {
             input.expect_colon()?;
             let mut animations = parse_animation(input)?;
 			animations.name.scope_hash = scope_hash;
-            log::debug!("{:?}", animations);
+            log::trace!("{:?}", animations);
             if animations.name.value.len() > 0 {
                 buffer.push_back(Attribute::AnimationName(AnimationNameType(animations.name)));
                 buffer.push_back(Attribute::AnimationDuration(AnimationDurationType(animations.duration)));
@@ -1887,21 +1905,20 @@ pub fn parse_style_item<'i, 't>(buffer: &mut VecDeque<Attribute>, scope_hash: us
 		"clip-path" => {
 			input.expect_colon()?;
 			let shape = BaseShape::parse(input)?;
-			log::debug!("{:?}", shape);
+			log::trace!("{:?}", shape);
 			buffer.push_back(Attribute::ClipPath(ClipPathType(shape)));
 		}
 
         _ => {
-            log::info!("{:?}", ValueParseErrorKind::InvalidAttr(Token::Ident(key.clone())));
-            end_cur_attr(input);
+			return Err( TokenParseError{location, error: TokenErrorsInfo::KeyError})
         }
     };
     Ok(())
 }
 
-pub fn parse_animation<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Animation, ParseError<'i, ValueParseErrorKind<'i>>> {
+pub fn parse_animation<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Animation, TokenParseError<'i>> {
     let mut animations = Animation::default();
-    parse_comma_separated::<_, (), ValueParseErrorKind<'i>>(input, |input| {
+    parse_comma_separated::<_, (), TokenParseError<'i>>(input, |input| {
         let mut has_duration = false;
         let location = input.current_source_location();
         let mut name = Atom::from("");
@@ -1942,7 +1959,7 @@ pub fn parse_animation<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Animation, 
 					"infinite" => iteration_count = IterationCount( f32::INFINITY),
                     ref name_str => {
                         if name.as_ref() != "" {
-                            return Err(location.new_unexpected_token_error(token.clone()));
+                            return Err(TokenParseError::from_message(location, format!("animation name id mult, {:?} and {:?}", name.as_str(), name_str)));
                         } else {
                             name = Atom::from(*name_str);
                         }
@@ -1954,7 +1971,7 @@ pub fn parse_animation<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Animation, 
                     } else if unit.as_ref() == "ms" {
                         Time(*value as usize)
                     } else {
-                        return Err(location.new_custom_error(ValueParseErrorKind::InvalidTime(token.clone())));
+                        return Err(TokenParseError::from_expect(location, "<time>", token.clone()));
                     };
                     if has_duration {
                         delay = time;
@@ -1983,13 +2000,14 @@ pub fn parse_animation<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Animation, 
                             ))
                         })?,
                         "linear" => {
-                            // input.parse_nested_block(|input| {
+							AnimationTimingFunction::Linear
+                        //     // input.parse_nested_block(|input| {
 
-                            // })?
-                            // TODO
-                            return Err(location.new_unexpected_token_error(token.clone()));
-                        }
-                        "steps" => input.parse_nested_block::<_, _, ValueParseErrorKind<'i>>(|input| {
+                        //     // })?
+                        //     // TODO
+                        //     return Err(location.new_custom_error(token.clone()));
+                        },
+                        "steps" => input.parse_nested_block::<_, _, TokenErrorsInfo<'i>>(|input| {
                             let location = input.current_source_location();
                             Ok(AnimationTimingFunction::Step(input.expect_number()? as usize, {
                                 if let Ok(_r) = input.expect_comma() {
@@ -1999,14 +2017,14 @@ pub fn parse_animation<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Animation, 
                                         "jump-end" | "end" => EStepMode::JumpEnd,
                                         "jump-none" => EStepMode::JumpNone,
                                         "jump-both" => EStepMode::JumpEnd,
-                                        _ => return Err(location.new_custom_error(ValueParseErrorKind::InvalidStepPosition(Token::Ident(p.clone())))),
+                                        _ => return Err(TokenParseError::from_expect(location, "jump-start | start | jump-end | end | jump-none | jump-both", Token::Ident(p.clone())))?,
                                     }
                                 } else {
                                     EStepMode::JumpStart
                                 }
                             }))
                         })?,
-                        _ => return Err(location.new_custom_error(ValueParseErrorKind::InvalidTimingFunction(token.clone()))),
+                        _ => return Err(TokenParseError::from_expect(location, "cubic-bezier | steps | jump-end | end | jump-none | jump-both", token.clone()))?,
                     }
                 }
 				// 支持老版本gui的写法， 小于0表示无穷次迭代
@@ -2032,11 +2050,11 @@ pub fn parse_animation<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Animation, 
 }
 
 pub trait StyleParse: Sized {
-    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, ParseError<'i, ValueParseErrorKind<'i>>>;
+    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, TokenParseError<'i>>;
 }
 
 impl StyleParse for Dimension {
-    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, ParseError<'i, ValueParseErrorKind<'i>>> {
+    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, TokenParseError<'i>> {
         if input.try_parse(|i| i.expect_ident_matching("auto")).is_ok() {
             return Ok(Dimension::Auto);
         }
@@ -2044,34 +2062,31 @@ impl StyleParse for Dimension {
         let location = input.current_source_location();
         let token = input.next()?;
         let dimension = match *token {
-            Token::Dimension { value, ref unit, .. } => match unit.as_ref() {
-                "px" => Dimension::Points(value),
-                _ => return Err(location.new_unexpected_token_error(token.clone())),
-            },
+            Token::Dimension { value, ref unit, .. } if unit.as_ref() == "px" => Dimension::Points(value),
             Token::Percentage { unit_value, .. } => Dimension::Percent(unit_value),
             Token::Number { value, .. } => Dimension::Points(value),
-            _ => return Err(location.new_unexpected_token_error(token.clone())),
+            _ => return Err(TokenParseError::from_expect(location, "<length> | <percentage>", token.clone()))?,
         };
         Ok(dimension)
     }
 }
 
 impl StyleParse for LengthUnit {
-    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, ParseError<'i, ValueParseErrorKind<'i>>> {
+    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, TokenParseError<'i>> {
         let location = input.current_source_location();
-		let toke = input.next()?;
-		match toke {
+		let token = input.next()?;
+		match token {
 			Token::Percentage { unit_value, .. } => Ok(LengthUnit::Percent(*unit_value)),
 			Token::Dimension { value, .. } => Ok(LengthUnit::Pixel(*value)),
 			Token::Number { value, .. } => Ok(LengthUnit::Pixel(*value)),
-			_ => Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+			_ => return Err(TokenParseError::from_expect(location, "<length> | <percentage>", token.clone()))?,
 		}
     }
 }
 
 
 impl StyleParse for IterationCount {
-    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, ParseError<'i, ValueParseErrorKind<'i>>> {
+    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, TokenParseError<'i>> {
         let location = input.current_source_location();
         let r = match input.next()? {
             Token::Ident(r) if r.as_ref() == "infinite" => f32::INFINITY,
@@ -2081,16 +2096,16 @@ impl StyleParse for IterationCount {
 			} else {
 				*value
 			},
-            token => return Err(location.new_custom_error(ValueParseErrorKind::InvalidAnimationIterationCount(token.clone()))),
+            token => return Err(TokenParseError::from_expect(location, "infinite | <number>", token.clone()))?,
         };
         Ok(IterationCount(r))
     }
 }
 
 /// 解析由逗号分割的列表，结果存放在SmallVec中
-pub fn parse_comma_separated<'i, 't, F, T, E>(input: &mut Parser<'i, 't>, mut parse_one: F) -> Result<SmallVec<[T; 1]>, ParseError<'i, E>>
+pub fn parse_comma_separated<'i, 't, F, T, E>(input: &mut Parser<'i, 't>, mut parse_one: F) -> Result<SmallVec<[T; 1]>, E>
 where
-    F: for<'tt> FnMut(&mut Parser<'i, 'tt>) -> Result<T, ParseError<'i, E>>,
+    F: for<'tt> FnMut(&mut Parser<'i, 'tt>) -> Result<T, E>,
 {
     // Vec grows from 0 to 4 by default on first push().  So allocate with
     // capacity 1, so in the somewhat common case of only one item we don't
@@ -2112,13 +2127,13 @@ where
 pub struct Percentage(pub f32);
 
 impl StyleParse for Percentage {
-    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, ParseError<'i, ValueParseErrorKind<'i>>> {
+    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, TokenParseError<'i>> {
         Ok(Percentage(input.expect_percentage()?))
     }
 }
 
 impl StyleParse for AnimationDirection {
-    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, ParseError<'i, ValueParseErrorKind<'i>>> {
+    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, TokenParseError<'i>> {
         let location = input.current_source_location();
         let p = input.expect_ident()?;
         match p.as_ref() {
@@ -2129,13 +2144,13 @@ impl StyleParse for AnimationDirection {
             "alternate-reverse" => Ok(AnimationDirection::AlternateReverse),
 			// 兼容老的gui的错误写法
 			"direction" => Ok(AnimationDirection::Normal),
-            _ => return Err(location.new_custom_error(ValueParseErrorKind::InvalidAnimationDirection(Token::Ident(p.clone())))),
+            _ => return Err(TokenParseError::from_expect(location, "normal | reverse | alternate | alternate-reverse | direction", Token::Ident(p.clone())))?,
         }
     }
 }
 
 impl StyleParse for Time {
-    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, ParseError<'i, ValueParseErrorKind<'i>>> {
+    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, TokenParseError<'i>> {
         let location = input.current_source_location();
         let token = input.next()?;
         if let Token::Dimension { value, unit, .. } = token {
@@ -2144,16 +2159,16 @@ impl StyleParse for Time {
             } else if unit.as_ref() == "ms" {
                 Self(*value as usize)
             } else {
-                return Err(location.new_custom_error(ValueParseErrorKind::InvalidTime(token.clone())));
+                return Err(TokenParseError::from_expect(location, "<time>", token.clone()))?;
             })
         } else {
-            return Err(location.new_custom_error(ValueParseErrorKind::InvalidTime(token.clone())));
+            return Err(TokenParseError::from_expect(location, "<time>", token.clone()))?;
         }
     }
 }
 
 impl StyleParse for AnimationTimingFunction {
-    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, ParseError<'i, ValueParseErrorKind<'i>>> {
+    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, TokenParseError<'i>> {
         let location = input.current_source_location();
         let token = input.next()?;
 
@@ -2166,11 +2181,11 @@ impl StyleParse for AnimationTimingFunction {
                 "linear" => Ok(AnimationTimingFunction::Linear),
                 "step-start" => Ok(AnimationTimingFunction::Step(1, EStepMode::JumpStart)),
                 "step-end" => Ok(AnimationTimingFunction::Step(1, EStepMode::JumpEnd)),
-                _ => return Err(location.new_unexpected_token_error(token.clone())),
+                _ => return Err(TokenParseError::from_expect(location, "ease | ease-in | ease-out | ease-in-out | linear | step-start | step-end | cubic-bezier(...) | steps | steps(...)", token.clone()))?
             },
             Token::Function(name) => {
                 match name.as_ref() {
-                    "cubic-bezier" => input.parse_nested_block(|input| {
+                    "cubic-bezier" => Ok(input.parse_nested_block(|input| {
                         Ok(AnimationTimingFunction::CubicBezier(
                             input.expect_number()?,
                             {
@@ -2186,15 +2201,16 @@ impl StyleParse for AnimationTimingFunction {
                                 input.expect_number()?
                             },
                         ))
-                    }),
+                    })?),
                     "linear" => {
-                        // input.parse_nested_block(|input| {
-
-                        // })?
+                        input.parse_nested_block(|_input| {
+							Ok(())
+                        })?;
+						Ok(AnimationTimingFunction::Linear)
                         // TODO
-                        return Err(location.new_unexpected_token_error(token.clone()));
+                        
                     }
-                    "steps" => input.parse_nested_block(|input| {
+                    "steps" => Ok(input.parse_nested_block(|input| {
                         let location = input.current_source_location();
                         Ok(AnimationTimingFunction::Step(input.expect_number()? as usize, {
                             if let Ok(_r) = input.expect_comma() {
@@ -2204,98 +2220,100 @@ impl StyleParse for AnimationTimingFunction {
                                     "jump-end" | "end" => EStepMode::JumpEnd,
                                     "jump-none" => EStepMode::JumpNone,
                                     "jump-both" => EStepMode::JumpEnd,
-                                    _ => return Err(location.new_custom_error(ValueParseErrorKind::InvalidStepPosition(Token::Ident(p.clone())))),
+                                    _ => return Err(TokenParseError::from_expect(location, "jump-start | start | jump-end | end | jump-none | jump-both", Token::Ident(p.clone())))?,
                                 }
                             } else {
                                 EStepMode::JumpStart
                             }
                         }))
-                    }),
-                    _ => return Err(location.new_custom_error(ValueParseErrorKind::InvalidTimingFunction(token.clone()))),
+                    })?),
+                    _ => return Err(TokenParseError::from_expect(location, "ease | ease-in | ease-out | ease-in-out | linear | step-start | step-end | cubic-bezier(...) | steps | steps(...)", token.clone()))?
                 }
             }
-            _ => return Err(location.new_unexpected_token_error(token.clone())),
+            _ => return Err(TokenParseError::from_expect(location, "ease | ease-in | ease-out | ease-in-out | linear | step-start | step-end | cubic-bezier(...) | steps | steps(...)", token.clone()))?
         }
     }
 }
 
 impl StyleParse for AnimationFillMode {
-    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, ParseError<'i, ValueParseErrorKind<'i>>> {
+    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, TokenParseError<'i>> {
         let location = input.current_source_location();
-        match input.expect_ident()?.as_ref() {
+		let ident = input.expect_ident()?;
+        match ident.as_ref() {
             // "auto" => Ok(AlignItems::Auto),
             "none" => Ok(AnimationFillMode::None),
             "forwards" => Ok(AnimationFillMode::Forwards),
             "backwards" => Ok(AnimationFillMode::Backwards),
             "both" => Ok(AnimationFillMode::Both),
-            _ => Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+            _ => return Err(TokenParseError::from_expect(location, "none | forwards | backwards | both", Token::Ident(ident.clone())))?
         }
     }
 }
 
 
 impl StyleParse for AnimationPlayState {
-    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, ParseError<'i, ValueParseErrorKind<'i>>> {
+    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, TokenParseError<'i>> {
         let location = input.current_source_location();
-        match input.expect_ident()?.as_ref() {
+        let ident = input.expect_ident()?;
+        match ident.as_ref() {
             // "auto" => Ok(AlignItems::Auto),
             "paused" => Ok(AnimationPlayState::Paused),
             "running" => Ok(AnimationPlayState::Running),
-            _ => Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+            _ => return Err(TokenParseError::from_expect(location, "paused | running", Token::Ident(ident.clone())))?
         }
     }
 }
 
 impl StyleParse for BaseShape {
-    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, ParseError<'i, ValueParseErrorKind<'i>>> {
+    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, TokenParseError<'i>> {
         let location = input.current_source_location();
 		let func_name = input.expect_function()?;
 		match func_name.as_ref() {
-			"inset" => input.parse_nested_block(|input| {
+			"inset" => Ok(input.parse_nested_block(|input| {
 				let mut rect = vec![parse_len_or_percent(input)?];
 				while let Ok(r) = input.try_parse(|input| {parse_len_or_percent(input)})  {
 					rect.push(r);
 				}
-				let radius = input.try_parse(|input| {
+				let radius = input.try_parse::<_, _, TokenParseError>(|input| {
 					let location1 = input.current_source_location();
 					let ident = input.expect_ident()?;
 					if ident.as_ref() == "round" {
 						Ok(parse_border_radius(input)?)
 					} else {
-						Err(location1.new_custom_error(ValueParseErrorKind::InvalidFilter))
+						Err(TokenParseError::from_expect(location1, "round", Token::Ident(ident.clone())))?
 					}
 				});
 				Ok(BaseShape::Inset { rect_box: to_four(rect), border_radius: match radius {
 					Ok(r) => r,
 					_ => BorderRadius::default(),
 				} })
-			}),
-			"circle" => input.parse_nested_block(|input| {
+			})?),
+			"circle" => Ok(input.parse_nested_block(|input| {
 				let radius = parse_len_or_percent(input)?;
 				let center = parse_center(input);
 				Ok(BaseShape::Circle { radius, center })
-			}),
-			"ellipse" => input.parse_nested_block(|input| {
+			})?),
+			"ellipse" => Ok(input.parse_nested_block(|input| {
 				let rx = parse_len_or_percent(input)?;
 				let ry = parse_len_or_percent(input)?;
 				let center = parse_center(input);
 				Ok(BaseShape::Ellipse { rx, ry, center })
-			}),
-			"sector" => input.parse_nested_block(|input| {
+			})?),
+			"sector" => Ok(input.parse_nested_block(|input| {
 				let rotate = parse_angle(input)?/180.0 * 3.1415926535;
 				let angle = parse_angle(input)?/180.0 * 3.1415926535;
 				let radius = parse_len_or_percent(input)?;
 				let center = parse_center(input);
 				Ok(BaseShape::Sector { rotate, angle, radius, center: center })
-			}),
-			_ => Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+			})?),
+			_ => Err(TokenParseError::from_expect(location, "inset | circle | ellipse | sector", Token::Ident(func_name.clone())))?
 		}
     }
 }
 
 fn parse_center<'i, 't>(input: &mut Parser<'i, 't>) -> Center {
     let mut center = Center {x: LengthUnit::Percent(0.5), y: LengthUnit::Percent(0.5)};
-	let _ = input.try_parse(|input| {
+	let _ = input.try_parse::<_, _, TokenParseError>(|input| {
 		let location1 = input.current_source_location();
 		let ident = input.expect_ident()?;
 		if ident.as_ref() == "at" {
@@ -2305,27 +2323,24 @@ fn parse_center<'i, 't>(input: &mut Parser<'i, 't>) -> Center {
 			};
 			Ok(())
 		} else {
-			Err(location1.new_custom_error(ValueParseErrorKind::InvalidFilter))
+			Err(TokenParseError::from_expect(location1, "at", Token::Ident(ident.clone())))?
 		}
 	});
 	center
 }
 
-fn parse_len<'i, 't>(input: &mut Parser<'i, 't>) -> Result<f32, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_len<'i, 't>(input: &mut Parser<'i, 't>) -> Result<f32, TokenParseError<'i>> {
     let location = input.current_source_location();
     let token = input.next()?;
     let dimension = match *token {
-        Token::Dimension { value, ref unit, .. } => match unit.as_ref() {
-            "px" => value,
-            _ => return Err(location.new_unexpected_token_error(token.clone())),
-        },
+        Token::Dimension { value, ref unit, .. } if unit.as_ref() == "px" => value,
         Token::Number { value, .. } => value,
-        _ => return Err(location.new_unexpected_token_error(token.clone())),
+        _ => return Err(TokenParseError::from_expect(location, "<length>", token.clone()))?
     };
     Ok(dimension)
 }
 
-fn parse_filter1<'i, 't>(buffer: &mut VecDeque<Attribute>, input: &mut Parser<'i, 't>) -> Result<(), ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_filter1<'i, 't>(buffer: &mut VecDeque<Attribute>, input: &mut Parser<'i, 't>) -> Result<(), TokenParseError<'i>> {
     let mut hah_hsi = false;
     let mut hsi = Hsi {
         hue_rotate: 0.0,
@@ -2343,11 +2358,9 @@ fn parse_filter1<'i, 't>(buffer: &mut VecDeque<Attribute>, input: &mut Parser<'i
         input.parse_nested_block(|i| {
             match function.as_ref() {
                 "blur" => {
-                    let ty = BlurType(match i.try_parse(|i| Dimension::parse(i))? {
-                        Dimension::Points(r) => r,
-                        _ => return Err(location.new_custom_error(ValueParseErrorKind::InvalidBlur)),
-                    });
-                    log::debug!("{:?}", ty);
+                    let ty = BlurType(i.try_parse(|i|  {
+						parse_len(i)
+                    })?);
                     buffer.push_back(Attribute::Blur(ty));
                 }
                 "hue-rotate" => {
@@ -2369,39 +2382,43 @@ fn parse_filter1<'i, 't>(buffer: &mut VecDeque<Attribute>, input: &mut Parser<'i
                 }
                 "hsi" => {
                     i.try_parse(|i| {
-                        let location = i.current_source_location();
                         i.skip_whitespace();
-                        i.parse_until_before::<_, _, ValueParseErrorKind<'i>>(Delimiter::Comma, |i| {
+                        i.parse_until_before::<_, _, TokenErrorsInfo<'i>>(Delimiter::Comma, |i| {
                             hsi.hue_rotate = trans_hsi_h(i.expect_number()?);
                             Ok(())
                         })?;
+						let location1 = i.current_source_location();
                         match i.next() {
                             Ok(&Token::Comma) => (),
-                            _ => return Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+							Ok(r) => return Err(TokenParseError::from_expect(location1, ",", r.clone())),
+                            _ => return Err(TokenParseError::from_expect_but_end(location1, ","))?,
                         }
                         i.skip_whitespace();
-                        i.parse_until_before::<_, _, ValueParseErrorKind<'i>>(Delimiter::Comma, |i| {
+                        i.parse_until_before::<_, _, TokenErrorsInfo<'i>>(Delimiter::Comma, |i| {
                             hsi.saturate = trans_hsi_s(i.expect_number()?);
                             Ok(())
                         })?;
+						let location1 = i.current_source_location();
                         match i.next() {
                             Ok(&Token::Comma) => (),
-                            _ => return Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+                            Ok(r) => return Err(TokenParseError::from_expect(location1, ",", r.clone()))?,
+                            _ => return Err(TokenParseError::from_expect_but_end(location1, ","))?,
                         }
                         i.skip_whitespace();
-                        i.parse_until_before::<_, _, ValueParseErrorKind<'i>>(Delimiter::Comma, |i| {
+                        i.parse_until_before::<_, _, TokenErrorsInfo<'i>>(Delimiter::Comma, |i| {
                             hsi.bright_ness = trans_hsi_i(i.expect_number()?);
                             Ok(())
                         })?;
+						let location1 = i.current_source_location();
                         match i.next() {
                             Ok(&Token::Comma) | Err(_) => (),
-                            Ok(_) => return Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+                            Ok(r) => return Err(TokenParseError::from_expect(location1, ",", r.clone()))?,
                         }
                         hah_hsi = true;
                         Ok(())
                     })?;
                 }
-                _ => return Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
+                _ => return Err(TokenParseError::from_expect(location, "blur | hue-rotate | saturate | brightness | grayscale | hsi", Token::Ident(function.clone())))?,
             };
             Ok(())
         })?;
@@ -2409,43 +2426,37 @@ fn parse_filter1<'i, 't>(buffer: &mut VecDeque<Attribute>, input: &mut Parser<'i
 
     if hah_hsi {
         let ty = HsiType(hsi);
-        log::debug!("{:?}", ty);
+        log::trace!("{:?}", ty);
         buffer.push_back(Attribute::Hsi(ty));
     }
 
     Ok(())
 }
 
-fn parse_color<'i, 't>(input: &mut Parser<'i, 't>) -> Result<CgColor, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_color<'i, 't>(input: &mut Parser<'i, 't>) -> Result<CgColor, TokenParseError<'i>> {
     let location = input.current_source_location();
     let token = input.next()?;
     match *token {
-        Token::Hash(ref value) | Token::IDHash(ref value) => match parse_color_hex(value.as_ref()) {
-            Ok(r) => Ok(r),
-            Err(_) => Err(location.new_custom_error(ValueParseErrorKind::InvalidColor)),
-        },
-        Token::Ident(ref value) => match parse_color_keyword(value.as_ref()) {
-            Ok(r) => Ok(r),
-            Err(_) => Err(location.new_custom_error(ValueParseErrorKind::InvalidColor)),
-        },
+        Token::Hash(ref value) | Token::IDHash(ref value) if let Ok(r) = parse_color_hex(value.as_ref()) => Ok(r),
+        Token::Ident(ref value) if let Ok(r) = parse_color_keyword(value.as_ref()) => Ok(r),
         Token::Function(ref name) => {
-            let name = name.clone();
-            input.parse_nested_block(|input| parse_color_function(&*name, input))
+			let n = name.clone();
+            Ok(input.parse_nested_block(|input| Ok(parse_color_function(location, n, input)?))?)
         }
-        _ => Err(location.new_custom_error(ValueParseErrorKind::InvalidColor)),
+        _ => return Err(TokenParseError::from_expect(location, "<color>", token.clone())),
     }
 }
 
-fn parse_background<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Color, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_background<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Color, TokenParseError<'i>> {
     let location = input.current_source_location();
     let function = input.expect_function()?;
     match function.as_ref() {
-        "linear-gradient" => Ok(Color::LinearGradient(input.parse_nested_block(parse_linear)?)),
-        _ => Err(location.new_custom_error(ValueParseErrorKind::InvalidBackground)),
+        "linear-gradient" => Ok(Color::LinearGradient(input.parse_nested_block(|input: &mut Parser| {Ok(parse_linear(input)?)})?)),
+        _ => return Err(TokenParseError::from_expect(location, "linear-gradient(...)", Token::Ident(function.clone()))),
     }
 }
 
-fn parse_linear<'i, 't>(input: &mut Parser<'i, 't>) -> Result<LinearGradientColor, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_linear<'i, 't>(input: &mut Parser<'i, 't>) -> Result<LinearGradientColor, TokenParseError<'i>> {
     let direction = if let Ok(d) = input.try_parse(|i| parse_angle(i)) {
         input.expect_comma()?;
         d - 90.0
@@ -2459,12 +2470,10 @@ fn parse_linear<'i, 't>(input: &mut Parser<'i, 't>) -> Result<LinearGradientColo
     })
 }
 
-fn parse_stops<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Vec<ColorAndPosition>, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_stops<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Vec<ColorAndPosition>, TokenParseError<'i>> {
     let mut list = Vec::new();
     let mut color_stop = Vec::new();
     let mut pre_percent = 0.0;
-
-    let location = input.current_source_location();
 
     loop {
         if let Err(e) = parse_stop_item(&mut list, &mut color_stop, &mut pre_percent, input) {
@@ -2475,10 +2484,7 @@ fn parse_stops<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Vec<ColorAndPositio
             _ => break,
         }
     }
-    if let Err(_) = parser_color_stop_last(1.0, &mut list, &mut color_stop, &mut pre_percent, None) {
-        return Err(location.new_custom_error(ValueParseErrorKind::InvalidLinear));
-    }
-
+    parser_color_stop_last(1.0, &mut list, &mut color_stop, &mut pre_percent, None)?;
     Ok(color_stop)
 }
 
@@ -2487,15 +2493,12 @@ fn parse_stop_item<'i, 't>(
     color_stop: &mut Vec<ColorAndPosition>,
     pre_percent: &mut f32,
     input: &mut Parser<'i, 't>,
-) -> Result<(), ParseError<'i, ValueParseErrorKind<'i>>> {
-    let location = input.current_source_location();
+) -> Result<(), TokenParseError<'i>> {
     let pos = input.try_parse(|i| i.expect_percentage());
     let color = parse_color(input)?;
 
     if let Ok(v) = pos {
-        if let Err(_) = parser_color_stop_last(v, list, color_stop, pre_percent, Some(color)) {
-            return Err(location.new_custom_error(ValueParseErrorKind::InvalidLinear));
-        }
+        parser_color_stop_last(v, list, color_stop, pre_percent, Some(color))?;
     } else {
         list.push(color);
     }
@@ -2503,14 +2506,11 @@ fn parse_stop_item<'i, 't>(
     Ok(())
 }
 
-pub fn parse_text_shadow<'i, 't>(input: &mut Parser<'i, 't>) -> Result<SmallVec<[TextShadow; 1]>, ParseError<'i, ValueParseErrorKind<'i>>> {
+pub fn parse_text_shadow<'i, 't>(input: &mut Parser<'i, 't>) -> Result<SmallVec<[TextShadow; 1]>, TokenParseError<'i>> {
     let mut arr = SmallVec::default();
-    let location = input.current_source_location();
+	let mut err;
     loop {
-        if let Err(e) = parse_text_shadow_item(input, &mut arr) {
-            log::error!("parse_text_shadow fail, {:?}", e);
-            break;
-        }
+        err = parse_text_shadow_item(input, &mut arr);
 
         match input.next() {
             Ok(&Token::Comma) => continue,
@@ -2520,14 +2520,17 @@ pub fn parse_text_shadow<'i, 't>(input: &mut Parser<'i, 't>) -> Result<SmallVec<
     if arr.len() > 0 {
         Ok(arr)
     } else {
-        Err(location.new_custom_error(ValueParseErrorKind::InvalidTextShadow))
+		return match err {
+			Ok(_) => unreachable!(),
+			Err(e) => Err(e),
+		}
     }
 }
 
 pub fn parse_text_shadow_item<'i, 't>(
     input: &mut Parser<'i, 't>,
     arr: &mut SmallVec<[TextShadow; 1]>,
-) -> Result<(), ParseError<'i, ValueParseErrorKind<'i>>> {
+) -> Result<(), TokenParseError<'i>> {
     let mut color = input.try_parse(parse_color);
     let h = input.try_parse(parse_len)?;
     let v = input.try_parse(parse_len)?;
@@ -2544,8 +2547,8 @@ pub fn parse_text_shadow_item<'i, 't>(
     Ok(())
 }
 
-fn parse_box_shadow<'i, 't>(input: &mut Parser<'i, 't>) -> Result<BoxShadow, ParseError<'i, ValueParseErrorKind<'i>>> {
-    input.parse_until_before(Delimiter::Comma, |i| {
+fn parse_box_shadow<'i, 't>(input: &mut Parser<'i, 't>) -> Result<BoxShadow, TokenParseError<'i>> {
+    Ok(input.parse_until_before(Delimiter::Comma, |i| {
         let h = parse_len(i)?;
         let v = parse_len(i)?;
         let blur = i.try_parse(|i| parse_len(i));
@@ -2558,7 +2561,7 @@ fn parse_box_shadow<'i, 't>(input: &mut Parser<'i, 't>) -> Result<BoxShadow, Par
             blur: blur.unwrap_or(0.0),
             color: color.unwrap_or(CgColor::new(0.0, 0.0, 0.0, 1.0)),
         })
-    })
+    })?)
 }
 
 pub enum GradientImage<'a> {
@@ -2566,64 +2569,154 @@ pub enum GradientImage<'a> {
     Url(CowRcStr<'a>),
 }
 
-fn parse_gradient_image<'i, 't>(input: &mut Parser<'i, 't>) -> Result<GradientImage<'i>, ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_gradient_image<'i, 't>(input: &mut Parser<'i, 't>) -> Result<GradientImage<'i>, TokenParseError<'i>> {
     let location = input.current_source_location();
-    let toke = input.next()?;
+    let token = input.next()?;
 
-    match toke {
+    match token {
         Token::UnquotedUrl(ref value) => Ok(GradientImage::Url(value.clone())),
         Token::Function(ref name) => {
             if name.eq_ignore_ascii_case("url") {
-                input.parse_nested_block(|input| input.expect_string().map_err(Into::into).map(|s| GradientImage::Url(s.clone())))
-            } else if name.eq_ignore_ascii_case("url") {
-                Ok(GradientImage::Linear(input.parse_nested_block(parse_linear)?))
+                Ok(input.parse_nested_block(|input| input.expect_string().map_err(Into::into).map(|s| GradientImage::Url(s.clone())))?)
+            } else if name.eq_ignore_ascii_case("linear-gradient") {
+                Ok(GradientImage::Linear(input.parse_nested_block(|input| {Ok(parse_linear(input)?)})?))
             } else {
-                Err(location.new_custom_error(ValueParseErrorKind::InvalidImage))
+				return Err(TokenParseError::from_expect(location, "url(...) | <url> | linear-gradient(...)", token.clone()));
             }
         }
-        _ => Err(location.new_custom_error(ValueParseErrorKind::InvalidImage)),
+        _ => return Err(TokenParseError::from_expect(location, "url(...) | <url> | linear-gradient(...)", token.clone()))
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum ValueParseErrorKind<'i> {
-    InvalidStepPosition(Token<'i>),
-    InvalidTimingFunction(Token<'i>),
-    InvalidTime(Token<'i>),
-    InvalidAnimationDirection(Token<'i>),
-    InvalidAnimationPlayState(Token<'i>),
-    InvalidAnimationPlayFillMode(Token<'i>),
-    InvalidAnimationIterationCount(Token<'i>),
-    InvalidAnimation(Token<'i>),
-    /// An invalid token was encountered while parsing a color value.
-    InvalidColor,
-    /// An invalid filter value was encountered.
-    InvalidFilter,
-    InvalidBlur,
-    InvalidHsi,
-    InvalidAttr(Token<'i>),
-    InvalidBackground,
-    InvalidLinear,
-    InvalidTextShadow,
-    InvalidImage,
-    InvalidObjectFit(Token<'i>),
-    InvalidRepeat(Token<'i>),
-    InvalidKeyFrameProgress(Token<'i>),
+#[derive(Debug, Error)]
+#[error("{error}, location: {location:?}")]
+pub struct TokenParseError<'i> {
+	pub location: SourceLocation,
+	pub error: TokenErrorsInfo<'i>
 }
 
-pub fn parse_angle<'i, 't>(input: &mut Parser<'i, 't>) -> Result<f32, ParseError<'i, ValueParseErrorKind<'i>>> {
+#[derive(Debug, Error)]
+pub enum TokenErrorsInfo<'i> {
+	#[error("expect: {0}, but parse id end")]
+	ExpectButEnd(&'static str),
+	#[error("expect: {0}, find: {1:?}")]
+	ExpectError(&'static str, Token<'i>),
+	#[error("{0}")]
+	ErrorMessage(String),
+	#[error("{0:?}")]
+	BaseParseError(BasicParseErrorKind<'i>),
+	#[error("")]
+	KeyError,
+}
+
+#[derive(Debug, Error)]
+pub enum ItemParseErrors<'i> {
+	#[error("expect: <attrribute>, find: {kind:?}, location: {location:?}")]
+	KeyError {
+		location: SourceLocation,
+		kind: BasicParseErrorKind<'i>,
+	},
+	#[error("attribute parse error from {attribute}, {error}")]
+	ValueError {
+		attribute: CowRcStr<'i>,
+		error: TokenParseError<'i>,
+	}
+}
+
+impl<'i> From<BasicParseError<'i>> for ItemParseErrors<'i> {
+    fn from(v: BasicParseError<'i>) -> ItemParseErrors<'i> {
+		ItemParseErrors::KeyError {
+			location: v.location,
+			kind: v.kind,
+		}
+    }
+}
+
+impl<'i> TokenParseError<'i> {
+	pub fn from_expect(location: SourceLocation, expect: &'static str, find: Token<'i>) -> Self {
+		TokenParseError {
+			location, 
+			error: TokenErrorsInfo::ExpectError(expect, find)
+		}
+	}
+	pub fn from_expect_but_end(location: SourceLocation, expect: &'static str) -> Self {
+		TokenParseError {
+			location, 
+			error: TokenErrorsInfo::ExpectButEnd(expect)
+		}
+	}
+
+	pub fn from_message(location: SourceLocation, message: String) -> Self {
+		TokenParseError {
+			location, 
+			error: TokenErrorsInfo::ErrorMessage(message)
+		}
+	}
+}
+
+
+// #[derive(Clone, Debug, PartialEq)]
+// pub struct ValueParseErrors<'i> (&'static str, Token<'i>);
+
+// impl<'i> Into<ValueParseError<'i>> for ParseError<'i, ()> {
+//     fn into(self) -> ValueParseError<'i> {
+//         ValueParseError::ParseError(self)
+//     }
+// }
+
+// required for `Result<f32, ValueParseError<'_>>` to implement `FromResidual<Result<Infallible, BasicParseError<'_>>>`
+
+impl<'i> From<ParseError<'i, TokenErrorsInfo<'i>>> for TokenParseError<'i> {
+    fn from(v: ParseError<'i, TokenErrorsInfo<'i>>) -> TokenParseError<'i> {
+		let error = match v.kind {
+			ParseErrorKind::Basic(r) => TokenErrorsInfo::BaseParseError(r),
+			ParseErrorKind::Custom(r) => r,
+		};
+		TokenParseError {
+			location: v.location,
+			error,
+		}
+    }
+}
+
+impl<'i> From<TokenParseError<'i>> for ParseError<'i, TokenErrorsInfo<'i>> {
+    fn from(v: TokenParseError<'i>) -> ParseError<'i, TokenErrorsInfo<'i>> {
+		let error = match v.error {
+			TokenErrorsInfo::BaseParseError(r) => ParseErrorKind::Basic(r),
+			r => ParseErrorKind::Custom(r),
+		};
+		ParseError {
+			location: v.location,
+			kind: error,
+		}
+    }
+}
+
+impl<'i> From<BasicParseError<'i>> for TokenParseError<'i> {
+    fn from(v: BasicParseError<'i>) -> TokenParseError<'i> {
+		TokenParseError {
+			location: v.location,
+			error: TokenErrorsInfo::BaseParseError(v.kind),
+		}
+    }
+}
+
+
+// impl<'i> From<BasicParseError<'i>> for ValueParseError<'i> {
+//     fn from(v: BasicParseError<'i>) -> ValueParseError<'i> {
+//         Self::BasicParseError(v)
+//     }
+// }
+
+pub fn parse_angle<'i, 't>(input: &mut Parser<'i, 't>) -> Result<f32, TokenParseError<'i>> {
     let location = input.current_source_location();
     let t = input.next()?;
-    match *t {
-        Token::Dimension { value, ref unit, .. } => match unit.as_ref() {
-            "deg" => Ok(value),
-            _ => Err(location.new_custom_error(ValueParseErrorKind::InvalidFilter)),
-        },
-        ref t => {
-            let t = t.clone();
-            Err(input.new_unexpected_token_error(t))
-        }
-    }
+	if let Token::Dimension { value, ref unit, .. } = *t {
+		if unit.as_ref() == "deg" {
+			return Ok(value);
+		}
+	}
+	Err(TokenParseError::from_expect(location, "deg", t.clone()))?
 }
 
 #[inline]
@@ -2790,11 +2883,11 @@ pub fn parse_color_keyword(ident: &str) -> Result<CgColor, ()> {
     Ok(color)
 }
 
-fn parse_color_function<'i, 't>(name: &str, input: &mut Parser<'i, 't>) -> Result<CgColor, ParseError<'i, ValueParseErrorKind<'i>>> {
-    let (red, green, blue, uses_commas) = match name {
+fn parse_color_function<'i, 't>(location: SourceLocation, name: CowRcStr<'i>, input: &mut Parser<'i, 't>) -> Result<CgColor, TokenParseError<'i>> {
+    let (red, green, blue, uses_commas) = match name.as_ref() {
         "rgb" | "rgba" => parse_rgb_components_rgb(input)?,
         // "hsl" | "hsla" => parse_rgb_components_hsl(input)?,
-        _ => return Err(input.new_unexpected_token_error(Token::Ident(name.to_owned().into()))),
+        _ => return Err(TokenParseError::from_expect(location, "rgb(...) | rgba(...)", Token::Ident(name.clone()))),
     };
 
     let alpha = if !input.is_exhausted() {
@@ -2812,7 +2905,7 @@ fn parse_color_function<'i, 't>(name: &str, input: &mut Parser<'i, 't>) -> Resul
     Ok(CgColor::new(red, green, blue, alpha))
 }
 
-fn parse_rgb_components_rgb<'i, 't>(input: &mut Parser<'i, 't>) -> Result<(f32, f32, f32, bool), ParseError<'i, ValueParseErrorKind<'i>>> {
+fn parse_rgb_components_rgb<'i, 't>(input: &mut Parser<'i, 't>) -> Result<(f32, f32, f32, bool), TokenParseError<'i>> {
     // Either integers or percentages, but all the same type.
     // https://drafts.csswg.org/css-color/#rgb-functions
     let red = input.expect_number()?;
@@ -2828,6 +2921,15 @@ fn parse_rgb_components_rgb<'i, 't>(input: &mut Parser<'i, 't>) -> Result<(f32, 
     Ok((red, green, blue, uses_commas))
 }
 
+#[test]
+fn test_error() {
+	env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
+    let s = ".c123{
+		width: 10deg;
+	}";
+
+    if let Err(_r) = parse_class_map_from_string(s, 0) {}
+}
 
 #[test]
 fn test1() {
@@ -2860,7 +2962,7 @@ fn test1() {
 
     if let Err(_r) = parse_class_map_from_string(s, 0) {}
 
-    // log::debug!("parse: {:?}", parse);
+    // log::trace!("parse: {:?}", parse);
 }
 
 #[test]

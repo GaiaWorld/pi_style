@@ -28,6 +28,7 @@ pi_flex_layout = "0.2"
 # pi_ecs = { git = "https://github.com/GaiaWorld/pi_ecs.git" }
 pi_curves = { git="https://github.com/GaiaWorld/pi_curves.git"}
 pi_animation = { git="https://github.com/GaiaWorld/pi_animation.git"}
+thiserror = "1.0"
 
 pi_print_any="0.1"
 
