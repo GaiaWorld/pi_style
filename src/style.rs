@@ -20,7 +20,7 @@ use pi_flex_layout::prelude::{INode, Number, Rect, Size as FlexSize};
 pub type Point2 = nalgebra::Point2<f32>;
 
 
-pub type Aabb2 = ncollide2d::bounding_volume::AABB<f32>;
+pub type Aabb2 = parry2d::bounding_volume::Aabb;
 #[derive(Debug, Deref, DerefMut, Clone, Serialize, Deserialize, Hash)]
 pub struct NotNanRect(pub Rect<NotNan<f32>>);
 
