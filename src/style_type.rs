@@ -507,7 +507,7 @@ macro_rules! impl_interpolation {
         }
 
         impl FrameValueScale for $ty {
-            fn scale(&self, rhs: KeyFrameCurveValue) -> Self { Self((self.0 as f32 * rhs).round() as $inner) }
+            fn scale(&self, rhs: KeyFrameCurveValue) -> Self { Self((self.0 as f32 * rhs) as $inner) }
         }
     };
 
@@ -700,7 +700,7 @@ impl AnimatableValue for f32 {
     #[inline]
     fn add(&self, rhs: &Self) -> Self { self + rhs }
     #[inline]
-    fn scale(&self, other: f32) -> Self { (self * other).round() as Self }
+    fn scale(&self, other: f32) -> Self { self * other }
 }
 
 impl AnimatableValue for Number {

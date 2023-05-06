@@ -1917,6 +1917,7 @@ pub fn parse_style_item_value<'i, 't>(location: SourceLocation, name: CowRcStr<'
 }
 
 pub fn parse_animation<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Animation, TokenParseError<'i>> {
+	
     let mut animations = Animation::default();
     parse_comma_separated::<_, (), TokenParseError<'i>>(input, |input| {
         let mut has_duration = false;
@@ -1948,6 +1949,7 @@ pub fn parse_animation<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Animation, 
                     "ease-out" => timing_function = AnimationTimingFunction::CubicBezier(0.0, 0.0, 0.58, 1.0),
                     "ease-in-out" => timing_function = AnimationTimingFunction::CubicBezier(0.42, 0.0, 0.58, 1.0),
                     "linear" => timing_function = AnimationTimingFunction::Linear,
+					"step" => timing_function = AnimationTimingFunction::Step(1, EStepMode::JumpStart), // 兼容曾经不规范的写法，移除？TODO
                     "step-start" => timing_function = AnimationTimingFunction::Step(1, EStepMode::JumpStart),
                     "step-end" => timing_function = AnimationTimingFunction::Step(1, EStepMode::JumpEnd),
                     "none" => fill_mode = AnimationFillMode::None,
@@ -1959,7 +1961,7 @@ pub fn parse_animation<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Animation, 
 					"infinite" => iteration_count = IterationCount( f32::INFINITY),
                     ref name_str => {
                         if name.as_ref() != "" {
-                            return Err(TokenParseError::from_message(location, format!("animation name id mult, {:?} and {:?}", name.as_str(), name_str)));
+                            return Err(TokenParseError::from_message(location, format!("animation name is mult, {:?} and {:?}", name.as_str(), name_str)));
                         } else {
                             name = Atom::from(*name_str);
                         }
