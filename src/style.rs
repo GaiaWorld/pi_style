@@ -319,16 +319,12 @@ pub enum BlendMode {
 #[derive(Deref, DerefMut, Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Show(pub usize);
 
-// 变换
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct Transform {
-    pub funcs: Vec<TransformFunc>,
-    pub origin: TransformOrigin,
-}
-
-impl Transform {
-    pub fn add_func(&mut self, f: TransformFunc) { self.funcs.push(f); }
-    pub fn set_origin(&mut self, o: TransformOrigin) { self.origin = o; }
+pub struct AllTransform {
+    pub transform: Vec<TransformFunc>,
+	pub translate: Option<[LengthUnit;2]>, // 平移，单位：px
+	pub scale: Option<[f32;2]>, // 缩放 0~1
+	pub rotate: Option<f32>, // 旋转，单位： 弧度
 }
 
 pub type TransformFuncs = Vec<TransformFunc>;
@@ -499,7 +495,6 @@ pub struct TextShadow {
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct TransformWillChange(pub TransformFuncs);
 
-
 // #[derive(Debug)]
 // pub struct Quad(pub Point2, pub Point2, pub Point2, pub Point2);
 
@@ -507,6 +502,16 @@ pub struct TransformWillChange(pub TransformFuncs);
 pub enum LengthUnit {
     Pixel(f32),
     Percent(f32),
+}
+
+impl LengthUnit {
+	#[inline]
+	pub fn get_absolute_value(&self, refer: f32) -> f32 {
+		match self {
+			LengthUnit::Pixel(r) => *r,
+			LengthUnit::Percent(r) => refer * r,
+		}
+	}
 }
 
 // #[derive(Clone, Copy, Debug, EnumDefault, Serialize, Deserialize)]
@@ -968,4 +973,7 @@ pub enum StyleType {
     AnimationPlayState = 86,
 
 	ClipPath = 87,
+	Translate = 88,
+	Scale = 89,
+	Rotate = 90,
 }

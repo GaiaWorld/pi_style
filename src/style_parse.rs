@@ -130,6 +130,9 @@ pub enum Attribute {
     AnimationFillMode(AnimationFillModeType),             // 85
     AnimationPlayState(AnimationPlayStateType),           // 86
 	ClipPath(ClipPathType),   // 87
+	Translate(TranslateType),                     // 88
+	Scale(ScaleType),                     // 89
+	Rotate(RotateType),                     // 90
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
@@ -526,6 +529,18 @@ impl ClassMap {
                     },
 					Attribute::ClipPath(r) => unsafe {
                         class_meta.class_style_mark.set(ClipPathType::get_type() as usize, true);
+                        r.write(&mut class_sheet.style_buffer);
+                    },
+					Attribute::Translate(r) => unsafe {
+                        class_meta.class_style_mark.set(TranslateType::get_type() as usize, true);
+                        r.write(&mut class_sheet.style_buffer);
+                    },
+                    Attribute::Scale(r) => unsafe {
+                        class_meta.class_style_mark.set(ScaleType::get_type() as usize, true);
+                        r.write(&mut class_sheet.style_buffer);
+                    },
+					Attribute::Rotate(r) => unsafe {
+                        class_meta.class_style_mark.set(RotateType::get_type() as usize, true);
                         r.write(&mut class_sheet.style_buffer);
                     },
                 }
@@ -1096,7 +1111,11 @@ pub fn parse_len_or_percent<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Length
     }
 }
 
-fn parse_transform<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Vec<TransformFunc>, TokenParseError<'i>> {
+pub fn parse_number<'i, 't>(input: &mut Parser<'i, 't>) -> Result<f32, TokenParseError<'i>> {
+	Ok(input.expect_number()?)
+}
+
+pub fn parse_transform<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Vec<TransformFunc>, TokenParseError<'i>> {
     let mut transforms = Vec::default();
 	let error;
     loop {
@@ -1564,11 +1583,34 @@ pub fn parse_style_item_value<'i, 't>(location: SourceLocation, name: CowRcStr<'
             log::trace!("{:?}", ty);
             buffer.push_back(Attribute::Transform(ty));
         }
+		"translate" => {
+			input.expect_colon()?;
+            let ty = TranslateType(parse_mult(input, [LengthUnit::default(), LengthUnit::default()], parse_len_or_percent)?);
+            log::trace!("{:?}", ty);
+            buffer.push_back(Attribute::Translate(ty));
+		},
+		"scale" => {
+			input.expect_colon()?;
+            let ty = ScaleType(parse_mult(input, [1.0, 1.0], parse_number)?);
+            log::trace!("{:?}", ty);
+            buffer.push_back(Attribute::Scale(ty));
+		},
+		"rotate" => {
+			input.expect_colon()?;
+            let ty = RotateType(parse_angle(input)?);
+            log::trace!("{:?}", ty);
+            buffer.push_back(Attribute::Rotate(ty));
+		},
         "transform-origin" => {
             input.expect_colon()?;
             let ty = TransformOriginType(parse_transform_origin(input)?);
             log::trace!("{:?}", ty);
             buffer.push_back(Attribute::TransformOrigin(ty));
+        }
+		"will-change-transform" => {
+            let ty = TransformWillChangeType(true);
+            log::trace!("{:?}", ty);
+            buffer.push_back(Attribute::TransformWillChange(ty));
         }
         "z-index" => {
             input.expect_colon()?;
@@ -2311,6 +2353,28 @@ impl StyleParse for BaseShape {
 			_ => Err(TokenParseError::from_expect(location, "inset | circle | ellipse | sector", Token::Ident(func_name.clone())))?
 		}
     }
+}
+
+pub fn parse_mult<'i, 't, const C: usize, O: Default + Copy, F: Fn(&mut Parser<'i, 't>) -> Result<O, TokenParseError<'i>> >(input: &mut Parser<'i, 't>, mut arr: [O;C], f: F) -> Result<[O;C], TokenParseError<'i>> {
+	let mut i = 0;
+	while i < C {
+		if let Ok(r) = input.try_parse(|input| {f(input)}) {
+			arr[i] = r;
+		} else {
+			break;
+		}
+		i += 1;
+	}
+	if C > 1 && i <= 1 {
+		arr[1] = arr[0];
+	}
+	if C > 2 && i <= 2 {
+		arr[2] = arr[0];
+	}
+	if C > 3 && i <= 3 {
+		arr[3] = arr[1];
+	}
+	Ok(arr)
 }
 
 fn parse_center<'i, 't>(input: &mut Parser<'i, 't>) -> Center {
@@ -3096,6 +3160,19 @@ fn test_clip_path() {
 		clip-path: sector(30deg 20deg 50px);
 		clip-path: sector(30deg 20deg 50px  at 50px);
 		clip-path: sector(30deg 20deg 20px at 50px 50px);
+	  }";
+
+    if let Ok(r) = parse_class_map_from_string(s, 0) {
+        println!("ret: {:?}", r);
+    }
+}
+
+#[test]
+fn test_will_change_transform() {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
+    let s = "
+	.c1363885129{
+		width:200px;height:100px;background-color:#45f518;transform: scale(0.6);will-change-transform
 	  }";
 
     if let Ok(r) = parse_class_map_from_string(s, 0) {

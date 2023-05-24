@@ -147,7 +147,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 86
+                    Self::get_type() as u8 + 90
                 }
                 fn size() -> usize {
                     0
@@ -173,7 +173,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 86
+                    Self::get_type() as u8 + 90
                 }
                 fn size() -> usize {
                     0
@@ -199,7 +199,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 86
+                    Self::get_type() as u8 + 90
                 }
                 fn size() -> usize {
                     0
@@ -225,7 +225,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 86
+                    Self::get_type() as u8 + 90
                 }
                 fn size() -> usize {
                     0
@@ -251,7 +251,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 86
+                    Self::get_type() as u8 + 90
                 }
                 fn size() -> usize {
                     0
@@ -278,7 +278,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 86
+                    Self::get_type() as u8 + 90
                 }
                 fn size() -> usize {
                     0
@@ -305,7 +305,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 86
+                    Self::get_type() as u8 + 90
                 }
                 fn size() -> usize {
                     0
@@ -331,7 +331,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 86
+                    Self::get_type() as u8 + 90
                 }
                 fn size() -> usize {
                     0
@@ -386,6 +386,12 @@ impl_style!(HsiType, hsi, Hsi);
 impl_style!(BlurType, blur, Blur, f32);
 impl_style!(TransformOriginType, transform, origin, TransformOrigin, TransformOrigin);
 impl_style!(TransformType, transform, funcs, Transform, TransformFuncs);
+impl_style!(TranslateType, transform, translate, Translate, TowLengthUnit);
+impl_style!(ScaleType, transform, scale, Scale, TowF32);
+impl_style!(RotateType, transform, rotate, Rotate, f32);
+type TowLengthUnit = [LengthUnit;2];
+type TowF32 = [f32;2];
+
 impl_style!(DirectionType, flex_container, direction, Direction, Direction);
 impl_style!(AspectRatioType, flex_normal, aspect_ratio, AspectRatio, Number);
 impl_style!(OrderType, flex_normal, order, Order, isize);
@@ -399,7 +405,7 @@ impl_style!(@func EnableType, show, set_enable, get_enable, Enable, Enable);
 impl_style!(@func TransformFuncType, transform, add_func, TransformFunc, TransformFunc);
 impl_style!(@func VNodeType, node_state, set_vnode, NodeState, bool);
 
-impl_style!(TransformWillChangeType, transform_will_change, TransformWillChange, TransformFuncs);
+impl_style!(TransformWillChangeType, transform_will_change, TransformWillChange, bool);
 
 impl_style!(ZIndexType, z_index, ZIndex, isize);
 impl_style!(OverflowType, overflow, Overflow, bool);
@@ -574,6 +580,10 @@ impl_interpolation!(@animatable_value, HsiType);
 impl_interpolation!(@animatable_value, BlurType);
 impl_interpolation!(@animatable_value, TransformOriginType);
 impl_interpolation!(@animatable_value, TransformType);
+// impl_interpolation!(@animatable_value, TranslateType);
+// impl_interpolation!(@animatable_value, ScaleType);
+impl_interpolation!(@animatable_value, RotateType);
+
 impl_interpolation!(@keep, DirectionType);
 impl_interpolation!(@animatable_value, AspectRatioType);
 impl_interpolation!(@number, OrderType, isize);
@@ -1096,4 +1106,22 @@ impl AnimatableValue for BaseShape {
         //     LengthUnit::Percent(r1) => LengthUnit::Percent(r1 * other),
         // }
     }
+}
+
+impl Add for TranslateType {
+	type Output = Self;
+	fn add(self, rhs: Self) -> Self::Output { Self([self.0[0].add(&rhs.0[0]), self.0[1].add(&rhs.0[1])]) }
+}
+
+impl FrameValueScale for TranslateType {
+	fn scale(&self, rhs: KeyFrameCurveValue) -> Self { Self([self.0[0].scale(rhs), self.0[1].scale(rhs)]) }
+}
+
+impl Add for ScaleType {
+	type Output = Self;
+	fn add(self, rhs: Self) -> Self::Output { Self([self.0[0].add(&rhs.0[0]), self.0[1].add(&rhs.0[1])]) }
+}
+
+impl FrameValueScale for ScaleType {
+	fn scale(&self, rhs: KeyFrameCurveValue) -> Self { Self([AnimatableValue::scale(&self.0[0], rhs), AnimatableValue::scale(&self.0[1], rhs)]) }
 }
