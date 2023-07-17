@@ -1134,24 +1134,13 @@ pub fn parse_transform<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Vec<Transfo
                 "scaleX" => input.parse_nested_block(|input| Ok(TransformFunc::ScaleX(input.expect_number()?))),
                 "scaleY" => input.parse_nested_block(|input| Ok(TransformFunc::ScaleY(input.expect_number()?))),
                 "translate" => input.parse_nested_block(|input| {
-                    let location = input.current_source_location();
                     let x = parse_len_or_percent(input)?;
                     input.expect_comma()?;
                     let y = parse_len_or_percent(input)?;
-                    match (x, y) {
-                        (LengthUnit::Percent(x), LengthUnit::Percent(y)) => Ok(TransformFunc::TranslatePercent(x, y)),
-                        (LengthUnit::Pixel(x), LengthUnit::Pixel(y)) => Ok(TransformFunc::Translate(x, y)),
-                        (x, y) => return Err(TokenParseError::from_message(location, format!("expect: <length> <length> |<percentage> <percentage>, find: {:?}, {:?}", x, y)))?,
-                    }
+                    Ok(TransformFunc::Translate(x, y))
                 }),
-                "translateX" => input.parse_nested_block(|input| match parse_len_or_percent(input)? {
-                    LengthUnit::Percent(v) => Ok(TransformFunc::TranslateXPercent(v)),
-                    LengthUnit::Pixel(v) => Ok(TransformFunc::TranslateX(v)),
-                }),
-                "translateY" => input.parse_nested_block(|input| match parse_len_or_percent(input)? {
-                    LengthUnit::Percent(v) => Ok(TransformFunc::TranslateYPercent(v)),
-                    LengthUnit::Pixel(v) => Ok(TransformFunc::TranslateY(v)),
-                }),
+                "translateX" => input.parse_nested_block(|input| Ok(TransformFunc::TranslateX(parse_len_or_percent(input)? ))),
+                "translateY" => input.parse_nested_block(|input| Ok(TransformFunc::TranslateY(parse_len_or_percent(input)? ))),
                 "rotate" | "rotateZ" => input.parse_nested_block(|input| Ok(TransformFunc::RotateZ(parse_angle(input)?))),
                 "skewX" => input.parse_nested_block(|input| Ok(TransformFunc::SkewX(parse_angle(input)?))),
                 "skewY" => input.parse_nested_block(|input| Ok(TransformFunc::SkewY(parse_angle(input)?))),
@@ -3197,3 +3186,18 @@ fn test_content() {
         println!("ret: {:?}", r);
     }
 }
+
+#[test]
+fn test_transform() {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
+    let s = r#"
+	.c1363885129{
+		transform: translate(0px,-50%),
+	  }"#;
+
+    if let Ok(r) = parse_class_map_from_string(s, 0) {
+        println!("ret: {:?}", r);
+    }
+}
+
+

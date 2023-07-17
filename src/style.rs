@@ -668,14 +668,9 @@ pub enum LineHeight {
 
 #[derive(Debug, Clone, Serialize, Deserialize, EnumDefault)]
 pub enum TransformFunc {
-    TranslateX(f32),
-    TranslateY(f32),
-    Translate(f32, f32),
-
-    //平移， 单位： %
-    TranslateXPercent(f32),
-    TranslateYPercent(f32),
-    TranslatePercent(f32, f32),
+    TranslateX(LengthUnit),
+	TranslateY(LengthUnit),
+	Translate(LengthUnit, LengthUnit),
 
     ScaleX(f32),
     ScaleY(f32),

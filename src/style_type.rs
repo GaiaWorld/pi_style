@@ -985,14 +985,9 @@ impl AnimatableValue for TransformFuncs {
         for i in 0..self.len() {
             let (t1, t2) = (&self[i], &rhs[i]);
             match (t1, t2) {
-                (TransformFunc::TranslateX(t1), TransformFunc::TranslateX(t2)) => vec.push(TransformFunc::TranslateX(t1 + t2)),
-                (TransformFunc::TranslateY(t1), TransformFunc::TranslateY(t2)) => vec.push(TransformFunc::TranslateY(t1 + t2)),
-                (TransformFunc::Translate(x1, y1), TransformFunc::Translate(x2, y2)) => vec.push(TransformFunc::Translate(x1 + x2, y1 + y2)),
-                (TransformFunc::TranslateXPercent(t1), TransformFunc::TranslateXPercent(t2)) => vec.push(TransformFunc::TranslateXPercent(t1 + t2)),
-                (TransformFunc::TranslateYPercent(t1), TransformFunc::TranslateYPercent(t2)) => vec.push(TransformFunc::TranslateYPercent(t1 + t2)),
-                (TransformFunc::TranslatePercent(x1, y1), TransformFunc::TranslatePercent(x2, y2)) => {
-                    vec.push(TransformFunc::TranslatePercent(x1 + x2, y1 + y2))
-                }
+                (TransformFunc::TranslateX(t1), TransformFunc::TranslateX(t2)) => vec.push(TransformFunc::TranslateX(t1.add(t2))),
+                (TransformFunc::TranslateY(t1), TransformFunc::TranslateY(t2)) => vec.push(TransformFunc::TranslateY(t1.add(t2))),
+                (TransformFunc::Translate(x1, y1), TransformFunc::Translate(x2, y2)) => vec.push(TransformFunc::Translate(x1.add(x2), y1.add(y2))),
                 (TransformFunc::ScaleX(t1), TransformFunc::ScaleX(t2)) => vec.push(TransformFunc::ScaleX(t1 + t2)),
                 (TransformFunc::ScaleY(t1), TransformFunc::ScaleY(t2)) => vec.push(TransformFunc::ScaleY(t1 + t2)),
                 (TransformFunc::Scale(x1, y1), TransformFunc::Scale(x2, y2)) => vec.push(TransformFunc::Scale(x1 + x2, y1 + y2)),
@@ -1012,12 +1007,9 @@ impl AnimatableValue for TransformFuncs {
         for i in 0..self.len() {
             let t1 = &self[i];
             match t1 {
-                TransformFunc::TranslateX(t1) => vec.push(TransformFunc::TranslateX(t1 * other)),
-                TransformFunc::TranslateY(t1) => vec.push(TransformFunc::TranslateY(t1 * other)),
-                TransformFunc::Translate(t1, t2) => vec.push(TransformFunc::Translate(t1 * other, t2 * other)),
-                TransformFunc::TranslateXPercent(t1) => vec.push(TransformFunc::TranslateXPercent(t1 * other)),
-                TransformFunc::TranslateYPercent(t1) => vec.push(TransformFunc::TranslateYPercent(t1 * other)),
-                TransformFunc::TranslatePercent(t1, t2) => vec.push(TransformFunc::TranslatePercent(t1 * other, t2 * other)),
+                TransformFunc::TranslateX(t1) => vec.push(TransformFunc::TranslateX(t1.scale(other))),
+                TransformFunc::TranslateY(t1) => vec.push(TransformFunc::TranslateY(t1.scale(other))),
+                TransformFunc::Translate(t1, t2) => vec.push(TransformFunc::Translate(t1.scale(other), t2.scale(other))),
                 TransformFunc::ScaleX(t1) => vec.push(TransformFunc::ScaleX(t1 * other)),
                 TransformFunc::ScaleY(t1) => vec.push(TransformFunc::ScaleY(t1 * other)),
                 TransformFunc::Scale(t1, t2) => vec.push(TransformFunc::Scale(t1 * other, t2 * other)),
