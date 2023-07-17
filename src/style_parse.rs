@@ -2008,7 +2008,7 @@ pub fn parse_animation<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Animation, 
 					"infinite" => iteration_count = IterationCount( f32::INFINITY),
                     ref name_str => {
                         if name.as_ref() != "" {
-                            return Err(TokenParseError::from_message(location, format!("animation name is mult, {:?} and {:?}", name.as_str(), name_str)));
+                            return Err(TokenParseError::from_message(location, format!("animation name is multiple, {} and {}", name.as_str(), name_str)));
                         } else {
                             name = Atom::from(*name_str);
                         }
