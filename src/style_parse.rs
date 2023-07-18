@@ -2560,7 +2560,12 @@ fn parse_stop_item<'i, 't>(
     if let Ok(v) = pos {
         parser_color_stop_last(v, list, color_stop, pre_percent, Some(color))?;
     } else {
-        list.push(color);
+		let pos = input.try_parse(|i| i.expect_percentage());
+		if let Ok(v) = pos {
+			parser_color_stop_last(v, list, color_stop, pre_percent, Some(color))?;
+		} else {
+			list.push(color);
+		}
     }
 
     Ok(())
@@ -2968,7 +2973,7 @@ fn parse_color_function<'i, 't>(location: SourceLocation, name: CowRcStr<'i>, in
 fn parse_rgb_components_rgb<'i, 't>(input: &mut Parser<'i, 't>) -> Result<(f32, f32, f32, bool), TokenParseError<'i>> {
     // Either integers or percentages, but all the same type.
     // https://drafts.csswg.org/css-color/#rgb-functions
-    let red = input.expect_number()?;
+    let red = input.expect_number()? / 256.0;
     let uses_commas = input.try_parse(|i| i.expect_comma()).is_ok();
 
     let green = input.expect_number()? / 256.0;
@@ -3192,7 +3197,11 @@ fn test_transform() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
     let s = r#"
 	.c1363885129{
-		transform: translate(0px,-50%),
+		@keyframes leftRightAnim {
+			0% {transform: translateY(600px); opacity: 0}
+			75% {transform: translateX(0px)}
+			100% {transform: translateX(0px); opacity: 1}
+		}
 	  }"#;
 
     if let Ok(r) = parse_class_map_from_string(s, 0) {
