@@ -16,11 +16,11 @@ use pi_flex_layout::{
 use pi_hash::XHashMap;
 use smallvec::SmallVec;
 
-use crate::style::{
+use crate::{style::{
     Aabb2, AnimationDirection, AnimationFillMode, AnimationPlayState, AnimationTimingFunction, BlendMode, BorderImageSlice, BorderRadius, BoxShadow,
     CgColor, Color, Enable, FitType, FontSize, FontStyle, Hsi, ImageRepeat, IterationCount, LengthUnit, LineHeight, MaskImage, NotNanRect, Point2,
     Stroke, StyleType, TextAlign, TextContent, TextShadow, Time, TransformFunc, TransformFuncs, TransformOrigin, VerticalAlign, WhiteSpace, AnimationName, BaseShape, Center,
-};
+}, style_parse::Attribute};
 use pi_curves::curve::frame::{FrameValueScale, KeyFrameCurveValue};
 use std::ops::Add;
 
