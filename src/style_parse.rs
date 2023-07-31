@@ -1990,7 +1990,7 @@ pub fn parse_animation<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Animation, 
                     "ease-out" => timing_function = AnimationTimingFunction::CubicBezier(0.0, 0.0, 0.58, 1.0),
                     "ease-in-out" => timing_function = AnimationTimingFunction::CubicBezier(0.42, 0.0, 0.58, 1.0),
                     "linear" => timing_function = AnimationTimingFunction::Linear,
-					"step" => timing_function = AnimationTimingFunction::Step(1, EStepMode::JumpStart), // 兼容曾经不规范的写法，移除？TODO
+					"step" => timing_function = AnimationTimingFunction::Step(1, EStepMode::JumpEnd), // 兼容曾经不规范的写法，移除？TODO
                     "step-start" => timing_function = AnimationTimingFunction::Step(1, EStepMode::JumpStart),
                     "step-end" => timing_function = AnimationTimingFunction::Step(1, EStepMode::JumpEnd),
                     "none" => fill_mode = AnimationFillMode::None,
@@ -2002,7 +2002,8 @@ pub fn parse_animation<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Animation, 
 					"infinite" => iteration_count = IterationCount( f32::INFINITY),
                     ref name_str => {
                         if name.as_ref() != "" {
-                            return Err(TokenParseError::from_message(location, format!("animation name is multiple, {} and {}", name.as_str(), name_str)));
+							continue; // 暂时不支持声明多个动画
+                            // return Err(TokenParseError::from_message(location, format!("animation name is multiple, {} and {}", name.as_str(), name_str)));
                         } else {
                             name = Atom::from(*name_str);
                         }
@@ -2067,7 +2068,10 @@ pub fn parse_animation<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Animation, 
                                 }
                             }))
                         })?,
-                        _ => return Err(TokenParseError::from_expect(location, "cubic-bezier | steps | jump-end | end | jump-none | jump-both", token.clone()))?,
+                        _ => {
+							continue; 
+							// return Err(TokenParseError::from_expect(location, "cubic-bezier | steps | jump-end | end | jump-none | jump-both", token.clone()))?
+						},
                     }
                 }
 				// 支持老版本gui的写法， 小于0表示无穷次迭代
@@ -2663,6 +2667,12 @@ fn parse_gradient_image<'i, 't>(input: &mut Parser<'i, 't>) -> Result<GradientIm
 pub struct TokenParseError<'i> {
 	pub location: SourceLocation,
 	pub error: TokenErrorsInfo<'i>
+}
+
+#[derive(Debug, Error)]
+#[error("{list:?}")]
+pub struct TokenParseErrorList<'i> {
+	pub list: Vec<TokenParseError<'i>>,
 }
 
 #[derive(Debug, Error)]

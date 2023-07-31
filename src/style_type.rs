@@ -16,12 +16,12 @@ use pi_flex_layout::{
 use pi_hash::XHashMap;
 use smallvec::SmallVec;
 
-use crate::{style::{
+use crate::style::{
     Aabb2, AnimationDirection, AnimationFillMode, AnimationPlayState, AnimationTimingFunction, BlendMode, BorderImageSlice, BorderRadius, BoxShadow,
     CgColor, Color, Enable, FitType, FontSize, FontStyle, Hsi, ImageRepeat, IterationCount, LengthUnit, LineHeight, MaskImage, NotNanRect, Point2,
     Stroke, StyleType, TextAlign, TextContent, TextShadow, Time, TransformFunc, TransformFuncs, TransformOrigin, VerticalAlign, WhiteSpace, AnimationName, BaseShape, Center,
-}, style_parse::Attribute};
-use pi_curves::curve::frame::{FrameValueScale, KeyFrameCurveValue};
+};
+use pi_curves::curve::frame::{FrameValueScale, FrameDataValue, KeyFrameCurveValue};
 use std::ops::Add;
 
 pub trait Attr: 'static + Sync + Send {
@@ -90,7 +90,7 @@ macro_rules! write_buffer {
     () => {
         unsafe fn write(&self, buffer: &mut Vec<u8>) {
             let ty_size = std::mem::size_of::<StyleType>();
-            let value_size = Self::size();
+            let value_size = <Self as Attr>::size();
             let len = buffer.len();
             buffer.reserve(ty_size + value_size);
             buffer.set_len(len + ty_size + value_size);
@@ -496,14 +496,33 @@ impl_style!(
 
 macro_rules! impl_interpolation {
     (@keep, $ty: ident) => {
-        impl Add for $ty {
-            type Output = Self;
-            fn add(self, _rhs: Self) -> Self::Output { self }
-        }
+		impl FrameDataValue for $ty {
+			fn interpolate(&self, rhs: &Self, amount: KeyFrameCurveValue) -> Self {
+				if amount == 0.0 {
+					self.clone()
+				} else {
+					rhs.clone()
+				}
+			}
+			fn hermite(_value1: &Self, _tangent1: &Self, _value2: &Self, _tangent2: &Self, _amount: KeyFrameCurveValue) -> Self {
+				todo!()
+			}
+			fn append(&self, _rhs: &Self, _amount: KeyFrameCurveValue) -> Self {
+				todo!()
+			}
+			fn size() -> usize {
+				std::mem::size_of::<Self>()
+			}
+		}
 
-        impl FrameValueScale for $ty {
-            fn scale(&self, _rhs: KeyFrameCurveValue) -> Self { self.clone() }
-        }
+        // impl Add for $ty {
+        //     type Output = Self;
+        //     fn add(self, _rhs: Self) -> Self::Output { self }
+        // }
+
+        // impl FrameValueScale for $ty {
+        //     fn scale(&self, _rhs: KeyFrameCurveValue) -> Self { self.clone() }
+        // }
     };
     // 为数字实现
     (@number, $ty: ident, $inner: ident) => {
