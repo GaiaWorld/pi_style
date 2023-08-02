@@ -19,7 +19,7 @@ use smallvec::SmallVec;
 use crate::style::{
     Aabb2, AnimationDirection, AnimationFillMode, AnimationPlayState, AnimationTimingFunction, BlendMode, BorderImageSlice, BorderRadius, BoxShadow,
     CgColor, Color, Enable, FitType, FontSize, FontStyle, Hsi, ImageRepeat, IterationCount, LengthUnit, LineHeight, MaskImage, NotNanRect, Point2,
-    Stroke, StyleType, TextAlign, TextContent, TextShadow, Time, TransformFunc, TransformFuncs, TransformOrigin, VerticalAlign, WhiteSpace, AnimationName, BaseShape, Center,
+    Stroke, StyleType, TextAlign, TextContent, TextShadow, Time, TransformFunc, TransformFuncs, TransformOrigin, VerticalAlign, WhiteSpace, AnimationName, BaseShape, Center, AsImage,
 };
 use pi_curves::curve::frame::{FrameValueScale, FrameDataValue, KeyFrameCurveValue};
 use std::ops::Add;
@@ -147,7 +147,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 90
+                    Self::get_type() as u8 + 91
                 }
                 fn size() -> usize {
                     0
@@ -173,7 +173,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 90
+                    Self::get_type() as u8 + 91
                 }
                 fn size() -> usize {
                     0
@@ -199,7 +199,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 90
+                    Self::get_type() as u8 + 91
                 }
                 fn size() -> usize {
                     0
@@ -225,7 +225,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 90
+                    Self::get_type() as u8 + 91
                 }
                 fn size() -> usize {
                     0
@@ -251,7 +251,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 90
+                    Self::get_type() as u8 + 91
                 }
                 fn size() -> usize {
                     0
@@ -278,7 +278,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 90
+                    Self::get_type() as u8 + 91
                 }
                 fn size() -> usize {
                     0
@@ -305,7 +305,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 90
+                    Self::get_type() as u8 + 91
                 }
                 fn size() -> usize {
                     0
@@ -331,7 +331,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 90
+                    Self::get_type() as u8 + 91
                 }
                 fn size() -> usize {
                     0
@@ -491,6 +491,8 @@ impl_style!(
     AnimationPlayState,
     SmallVec<[AnimationPlayState; 1]>
 );
+
+impl_style!(AsImageType, as_image, AsImage, AsImage);
 
 // impl_style!(ZIndexType, z_index, ZIndex, isize);
 

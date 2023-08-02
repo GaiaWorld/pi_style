@@ -20,7 +20,7 @@ use thiserror::Error;
 use crate::style::{
     Animation, AnimationDirection, AnimationFillMode, AnimationPlayState, AnimationTimingFunction, BlendMode, BorderImageSlice, BorderRadius,
     BoxShadow, CgColor, Color, ColorAndPosition, Enable, FitType, FontSize, Hsi, ImageRepeat, ImageRepeatOption, IterationCount, LengthUnit,
-    LineHeight, LinearGradientColor, MaskImage, NotNanRect, Stroke, TextAlign, TextShadow, Time, TransformFunc, TransformOrigin, WhiteSpace, AnimationName, BaseShape, Center, TextContent,
+    LineHeight, LinearGradientColor, MaskImage, NotNanRect, Stroke, TextAlign, TextShadow, Time, TransformFunc, TransformOrigin, WhiteSpace, AnimationName, BaseShape, Center, TextContent, AsImage,
 };
 
 use super::style_type::*;
@@ -133,6 +133,8 @@ pub enum Attribute {
 	Translate(TranslateType),                     // 88
 	Scale(ScaleType),                     // 89
 	Rotate(RotateType),                     // 90
+
+	AsImage(AsImageType),                     // 91
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
@@ -558,6 +560,10 @@ pub fn style_to_buffer(style_buffer: &mut Vec<u8>, mut style: Attribute,  class_
 			class_meta.class_style_mark.set(RotateType::get_type() as usize, true);
 			r.write(style_buffer);
 		},
+		Attribute::AsImage(r) => unsafe {
+			class_meta.class_style_mark.set(AsImageType::get_type() as usize, true);
+			r.write(style_buffer);
+		},
 	}
 	std::mem::forget(style);
 }
@@ -926,6 +932,18 @@ fn parse_blend_mode<'i, 't>(input: &mut Parser<'i, 't>) -> Result<BlendMode, Tok
         "multiply" => BlendMode::Multiply,
         "one-one" => BlendMode::OneOne,
         _ => return Err(TokenParseError::from_expect(location, "normal | alpha-add | subtract | multiply | one-one", Token::Ident(ident.clone())))?,
+    };
+    Ok(r)
+}
+
+fn parse_as_image<'i, 't>(input: &mut Parser<'i, 't>) -> Result<AsImage, TokenParseError<'i>> {
+    let location = input.current_source_location();
+    let ident = input.expect_ident()?;
+    let r = match ident.as_ref() {
+        "none" => AsImage::None,
+        "advise" => AsImage::Advise,
+        "force" => AsImage::Force,
+        _ => return Err(TokenParseError::from_expect(location, "none | advise | force", Token::Ident(ident.clone())))?,
     };
     Ok(r)
 }
@@ -1948,6 +1966,12 @@ pub fn parse_style_item_value<'i, 't>(location: SourceLocation, name: CowRcStr<'
 			let shape = BaseShape::parse(input)?;
 			log::trace!("{:?}", shape);
 			buffer.push_back(Attribute::ClipPath(ClipPathType(shape)));
+		}
+		"as-image" => {
+			input.expect_colon()?;
+			let as_image = parse_as_image(input)?;
+			log::trace!("{:?}", as_image);
+			buffer.push_back(Attribute::AsImage(AsImageType(as_image)));
 		}
 
         _ => {
@@ -3218,6 +3242,25 @@ fn test_transform() {
 			100% {transform: translateX(0px); opacity: 1}
 		}
 	  }"#;
+
+    if let Ok(r) = parse_class_map_from_string(s, 0) {
+        println!("ret: {:?}", r);
+    }
+}
+
+#[test]
+fn test_as_image() {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
+    let s = r#"
+	.c1363885129{
+		as-image: none;
+	}
+	.c2{
+		as-image: advise;
+	}
+	.c3{
+		as-image: force;
+	}"#;
 
     if let Ok(r) = parse_class_map_from_string(s, 0) {
         println!("ret: {:?}", r);

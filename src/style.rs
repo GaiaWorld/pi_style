@@ -1,5 +1,8 @@
 /// 用户操作的组件定义
 /// 遵循css对应属性的语意
+/// 扩展属性：
+/// 1. as-image（force、advise、none）： 作为图像缓存， force表示强制缓存为图像；advise表示建议缓存为图像，当缓存空间不足时，不缓存；none表示不缓存为图像，该属性默认为none
+/// 
 use std::default::Default;
 use std::{
     hash::{Hash, Hasher},
@@ -306,7 +309,7 @@ pub struct Overflow(pub bool);
 pub struct Opacity(pub f32);
 
 /// 渲染模式
-#[derive(Clone, Debug, Serialize, Deserialize, EnumDefault)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, EnumDefault)]
 pub enum BlendMode {
     Normal,
     AlphaAdd,
@@ -858,6 +861,17 @@ impl Default for Show {
 #[derive(Clone, Default, Deref, DerefMut, Debug, Serialize, Deserialize)]
 pub struct NodeState(pub INode);
 
+/// 作为图像缓存
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, EnumDefault, PartialEq, Eq, Hash)]
+pub enum AsImage {
+	/// 不缓存为图像
+	None,
+	/// 建议缓存为图像，当缓存空间不足时，不缓存
+	Advise,
+	/// 强制缓存为图像
+	Force,
+}
+
 // 枚举样式的类型
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum StyleType {
@@ -971,4 +985,6 @@ pub enum StyleType {
 	Translate = 88,
 	Scale = 89,
 	Rotate = 90,
+
+	AsImage = 91,
 }
