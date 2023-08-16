@@ -936,7 +936,7 @@ fn parse_blend_mode<'i, 't>(input: &mut Parser<'i, 't>) -> Result<BlendMode, Tok
     Ok(r)
 }
 
-fn parse_as_image<'i, 't>(input: &mut Parser<'i, 't>) -> Result<AsImage, TokenParseError<'i>> {
+pub fn parse_as_image<'i, 't>(input: &mut Parser<'i, 't>) -> Result<AsImage, TokenParseError<'i>> {
     let location = input.current_source_location();
     let ident = input.expect_ident()?;
     let r = match ident.as_ref() {
