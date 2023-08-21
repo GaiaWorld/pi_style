@@ -2,8 +2,6 @@
 //! * 为所有的样式类型实现Attr这个tarit
 //! * 为所有的样式类型实现Add和Scale trait，用于动画插值
 
-use std::mem::forget;
-
 use bitvec::array::BitArray;
 use ordered_float::NotNan;
 use pi_atom::Atom;
@@ -113,7 +111,7 @@ macro_rules! write_buffer {
                 buffer.as_mut_ptr().add(len + ty_size),
                 value_size,
             );
-            forget(self)
+            // forget(self)
         }
     };
 }

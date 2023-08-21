@@ -1,8 +1,12 @@
 [package]
 name = "pi_style"
 version = "0.1.0"
-authors = ["suncy <suncy@gmail.com>"]
+authors = ["suncy <@gmail.com>"]
 edition = "2021"
+description = "css struct define and parse"
+repository = "https://github.com/GaiaWorld/pi_style"
+license = "MIT OR Apache-2.0"
+keywords = ["pi", "style", "css"]
 
 [dependencies]
 num-traits = "0.2"
@@ -25,8 +29,8 @@ pi_hash="0.1"
 # pi_flex_layout = { git = "https://github.com/GaiaWorld/pi_flex_layout.git" }
 pi_flex_layout = "0.2"
 # pi_ecs = { git = "https://github.com/GaiaWorld/pi_ecs.git" }
-pi_curves = { git="https://github.com/GaiaWorld/pi_curves.git"}
-pi_animation = { git="https://github.com/GaiaWorld/pi_animation.git"}
+pi_curves = {version = "0.1", registry = "yn"}
+pi_animation = {version = "0.1", registry = "yn"}
 thiserror = "1.0"
 
 pi_print_any="0.1"
