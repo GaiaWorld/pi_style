@@ -504,7 +504,7 @@ macro_rules! impl_interpolation {
 					rhs.clone()
 				}
 			}
-			fn hermite(_value1: &Self, _tangent1: &Self, _value2: &Self, _tangent2: &Self, _amount: KeyFrameCurveValue) -> Self {
+			fn hermite(_value1: &Self, _tangent1: &Self, _value2: &Self, _tangent2: &Self, _amount: KeyFrameCurveValue, _frame_delta: KeyFrameCurveValue) -> Self {
 				todo!()
 			}
 			fn append(&self, _rhs: &Self, _amount: KeyFrameCurveValue) -> Self {
