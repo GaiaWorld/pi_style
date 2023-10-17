@@ -1165,9 +1165,11 @@ pub fn parse_transform<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Vec<Transfo
                 "translateX" => input.parse_nested_block(|input| Ok(TransformFunc::TranslateX(parse_len_or_percent(input)? ))),
                 "translateY" => input.parse_nested_block(|input| Ok(TransformFunc::TranslateY(parse_len_or_percent(input)? ))),
                 "rotate" | "rotateZ" => input.parse_nested_block(|input| Ok(TransformFunc::RotateZ(parse_angle(input)?))),
+				"rotateX" => input.parse_nested_block(|input| Ok(TransformFunc::RotateX(parse_angle(input)?))),
+				"rotateY" => input.parse_nested_block(|input| Ok(TransformFunc::RotateY(parse_angle(input)?))),
                 "skewX" => input.parse_nested_block(|input| Ok(TransformFunc::SkewX(parse_angle(input)?))),
                 "skewY" => input.parse_nested_block(|input| Ok(TransformFunc::SkewY(parse_angle(input)?))),
-                _ => return Err(TokenParseError::from_expect(location, "scale | scaleX | scaleY | translate | translateX | translateY | rotateZ | skewX | skewY", Token::Ident(f.clone())))?,
+                _ => return Err(TokenParseError::from_expect(location, "scale | scaleX | scaleY | translate | translateX | translateY | rotate | rotateX | rotateY | rotateZ | skewX | skewY", Token::Ident(f.clone())))?,
             }
         });
 		match r {
@@ -1614,6 +1616,11 @@ pub fn parse_style_item_value<'i, 't>(location: SourceLocation, name: CowRcStr<'
 		},
 		"rotate" => {
 			input.expect_colon()?;
+			// rotate: 90deg;
+			/* x, y, or z axis name plus angle 暂不支持 */
+			// rotate: x 90deg;
+			/* Vector plus angle value 暂不支持 */
+			// rotate: 1 1 1 90deg;
             let ty = RotateType(parse_angle(input)?);
             log::trace!("{:?}", ty);
             buffer.push_back(Attribute::Rotate(ty));
