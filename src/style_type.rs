@@ -498,10 +498,10 @@ macro_rules! impl_interpolation {
     (@keep, $ty: ident) => {
 		impl FrameDataValue for $ty {
 			fn interpolate(&self, rhs: &Self, amount: KeyFrameCurveValue) -> Self {
-				if amount == 0.0 {
-					self.clone()
-				} else {
+				if amount == 1.0 {
 					rhs.clone()
+				} else {
+					self.clone()
 				}
 			}
 			fn hermite(_value1: &Self, _tangent1: &Self, _value2: &Self, _tangent2: &Self, _amount: KeyFrameCurveValue, _frame_delta: KeyFrameCurveValue) -> Self {
@@ -539,7 +539,7 @@ macro_rules! impl_interpolation {
     (@animatable_value, $ty: ident) => {
         impl Add for $ty {
             type Output = Self;
-            fn add(self, rhs: Self) -> Self::Output { $ty(self.0.add(&rhs.0)) }
+            fn add(self, rhs: Self) -> Self::Output {$ty(self.0.add(&rhs.0)) }
         }
 
         impl FrameValueScale for $ty {

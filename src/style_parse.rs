@@ -1988,6 +1988,46 @@ pub fn parse_style_item_value<'i, 't>(location: SourceLocation, name: CowRcStr<'
     Ok(())
 }
 
+// fixbit   all   &mut World
+
+// fn A() {
+
+// }
+
+// pub fn aaa(
+
+// 	query: ParamSet<(Query<EntityRef>, Query<&mut B>), (),   A>
+// 	// 	Query<(&A, &mut B)>
+// 	query: Query<EntityRef>,
+// 	query1: Query<&mut B>,
+// 	// Query<(&mut B)>
+// 	// 	Add<(C)>,
+// 	// )>,
+// 	add: Add<(C)>,
+// 	insert: Insert<(A, B)>
+// ) {
+// 	let (e, a, b) = query.get(e).unrap();
+// 	query.p0().iter();
+// 	add(e, (C));
+// 	a, b
+// 	query.p0().iter(|| {
+
+// 	})
+// 	// let r = insert((A, B));
+// 	// querySet
+	
+// 	let mut vec: &'static mut Vec<usize> = unsafe { transmute(querySet.p0()) } ;
+// 	// querySet.p1()
+// 	let iter = vec.iter();
+// 	vec.
+// 	iter_index.next(&mut vec)
+// 	let mut item = iter.next();
+// 	while let Some(item) = item {
+
+// 	}
+// }
+
+
 pub fn parse_animation<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Animation, TokenParseError<'i>> {
 	
     let mut animations = Animation::default();
