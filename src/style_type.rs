@@ -18,9 +18,11 @@ use crate::style::{
     Aabb2, AnimationDirection, AnimationFillMode, AnimationPlayState, AnimationTimingFunction, BlendMode, BorderImageSlice, BorderRadius, BoxShadow,
     CgColor, Color, Enable, FitType, FontSize, FontStyle, Hsi, ImageRepeat, IterationCount, LengthUnit, LineHeight, MaskImage, NotNanRect, Point2,
     Stroke, StyleType, TextAlign, TextContent, TextShadow, Time, TransformFunc, TransformFuncs, TransformOrigin, VerticalAlign, WhiteSpace, AnimationName, BaseShape, Center, AsImage,
+	TextOverflow,
 };
 use pi_curves::curve::frame::{FrameValueScale, FrameDataValue, KeyFrameCurveValue};
 use std::ops::Add;
+pub use pi_flex_layout::style::OverflowWrap;
 
 pub trait Attr: 'static + Sync + Send {
     /// 获取样式属性类型
@@ -353,6 +355,7 @@ impl_style!(WordSpacingType, text_style, word_spacing, WordSpacing, f32);
 impl_style!(LineHeightType, text_style, line_height, LineHeight, LineHeight);
 impl_style!(TextIndentType, text_style, text_indent, TextIndent, f32);
 impl_style!(WhiteSpaceType, text_style, white_space, WhiteSpace, WhiteSpace);
+impl_style!(TextOverflowType, text_style, text_overflow, TextOverflow, TextOverflow);
 
 impl_style!(TextContentType, text_content, TextContent);
 impl_style!(TextAlignType, text_style, text_align, TextAlign, TextAlign);
@@ -444,6 +447,7 @@ impl_style!(FlexDirectionType, flex_container, flex_direction, FlexDirection, Fl
 impl_style!(AlignContentType, flex_container, align_content, AlignContent, AlignContent);
 impl_style!(AlignItemsType, flex_container, align_items, AlignItems, AlignItems);
 impl_style!(FlexWrapType, flex_container, flex_wrap, FlexWrap, FlexWrap);
+impl_style!(OverflowWrapType, flex_container, overflow_wrap, OverflowWrap, OverflowWrap);
 
 impl_style!(FlexShrinkType, flex_normal, flex_shrink, FlexShrink, f32);
 impl_style!(FlexGrowType, flex_normal, flex_grow, FlexGrow, f32);

@@ -11,7 +11,7 @@ use pi_atom::Atom;
 use pi_curves::steps::EStepMode;
 use pi_flex_layout::{
     prelude::Rect,
-    style::{AlignContent, AlignItems, AlignSelf, Dimension, Display, FlexDirection, FlexWrap, JustifyContent, PositionType},
+    style::{AlignContent, AlignItems, AlignSelf, Dimension, Display, FlexDirection, FlexWrap, JustifyContent, PositionType, OverflowWrap},
 };
 use pi_hash::XHashMap;
 use smallvec::SmallVec;
@@ -20,7 +20,7 @@ use thiserror::Error;
 use crate::style::{
     Animation, AnimationDirection, AnimationFillMode, AnimationPlayState, AnimationTimingFunction, BlendMode, BorderImageSlice, BorderRadius,
     BoxShadow, CgColor, Color, ColorAndPosition, Enable, FitType, FontSize, Hsi, ImageRepeat, ImageRepeatOption, IterationCount, LengthUnit,
-    LineHeight, LinearGradientColor, MaskImage, NotNanRect, Stroke, TextAlign, TextShadow, Time, TransformFunc, TransformOrigin, WhiteSpace, AnimationName, BaseShape, Center, TextContent, AsImage,
+    LineHeight, LinearGradientColor, MaskImage, NotNanRect, Stroke, TextAlign, TextShadow, Time, TransformFunc, TransformOrigin, WhiteSpace, AnimationName, BaseShape, Center, TextContent, AsImage, TextOverflow,
 };
 
 use super::style_type::*;
@@ -135,6 +135,9 @@ pub enum Attribute {
 	Rotate(RotateType),                     // 90
 
 	AsImage(AsImageType),                     // 91
+
+	TextOverflow(TextOverflowType), // 92 
+	OverflowWrap(OverflowWrapType), // 93
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
@@ -562,6 +565,14 @@ pub fn style_to_buffer(style_buffer: &mut Vec<u8>, mut style: Attribute,  class_
 		},
 		Attribute::AsImage(r) => unsafe {
 			class_meta.class_style_mark.set(AsImageType::get_type() as usize, true);
+			r.write(style_buffer);
+		},
+		Attribute::TextOverflow(r) => unsafe {
+			class_meta.class_style_mark.set(TextOverflowType::get_type() as usize, true);
+			r.write(style_buffer);
+		},
+		Attribute::OverflowWrap(r) => unsafe {
+			class_meta.class_style_mark.set(OverflowWrapType::get_type() as usize, true);
 			r.write(style_buffer);
 		},
 	}
@@ -1979,7 +1990,19 @@ pub fn parse_style_item_value<'i, 't>(location: SourceLocation, name: CowRcStr<'
 			let as_image = parse_as_image(input)?;
 			log::trace!("{:?}", as_image);
 			buffer.push_back(Attribute::AsImage(AsImageType(as_image)));
-		}
+		},
+		"text_overflow" => {
+			input.expect_colon()?;
+			let text_overflow = TextOverflow::parse(input)?;
+			log::trace!("{:?}", text_overflow);
+			buffer.push_back(Attribute::TextOverflow(TextOverflowType(text_overflow)));
+		},
+		"overflow-wrap" => {
+			input.expect_colon()?;
+			let overflow_wrap = OverflowWrap::parse(input)?;
+			log::trace!("{:?}", overflow_wrap);
+			buffer.push_back(Attribute::OverflowWrap(OverflowWrapType(overflow_wrap)));
+		},
 
         _ => {
 			return Err( TokenParseError{location, error: TokenErrorsInfo::KeyError})
@@ -2381,6 +2404,44 @@ impl StyleParse for AnimationPlayState {
         }
     }
 }
+
+impl StyleParse for TextOverflow {
+    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, TokenParseError<'i>> {
+		let r = input.try_parse::<_, _, TokenParseError>(|input| {
+			let location = input.current_source_location();
+			let ident = input.expect_ident()?;
+			match ident.as_ref() {
+				"clip" => Ok(TextOverflow::Clip),
+				"ellipsis" => Ok(TextOverflow::Ellipsis),
+				_ => return Err(TokenParseError::from_expect(location, "clip | ellipsis | <string>", Token::Ident(ident.clone())))?,
+			}
+		});
+		if r.is_ok() {
+			return r;
+		}
+
+       let location = input.current_source_location();
+		let next = input.next()?;
+		match next {
+			Token::QuotedString(r) => return Ok(TextOverflow::Custom(r.to_string())),
+			_ => return Err(TokenParseError::from_expect(location, "clip | ellipsis | <string>", next.clone()))?
+		};
+    }
+}
+
+impl StyleParse for OverflowWrap {
+    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, TokenParseError<'i>> {
+		let location = input.current_source_location();
+		let ident = input.expect_ident()?;
+		match ident.as_ref() {
+			"normal" => Ok(OverflowWrap::Normal),
+			"anywhere" => Ok(OverflowWrap::Anywhere),
+			"break-word" => Ok(OverflowWrap::BreakWord),
+			_ => return Err(TokenParseError::from_expect(location, "normal | anywhere | break-word", Token::Ident(ident.clone())))?,
+		}
+    }
+}
+
 
 impl StyleParse for BaseShape {
     fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, TokenParseError<'i>> {

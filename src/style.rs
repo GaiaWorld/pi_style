@@ -13,7 +13,7 @@ use ordered_float::NotNan;
 use pi_curves::easing::EEasingMode;
 use pi_curves::steps::EStepMode;
 use pi_flex_layout::style::{
-    AlignContent, AlignItems, AlignSelf, Dimension, Direction, Display, FlexDirection, FlexWrap, JustifyContent, PositionType,
+    AlignContent, AlignItems, AlignSelf, Dimension, Direction, Display, FlexDirection, FlexWrap, JustifyContent, PositionType, OverflowWrap,
 };
 use smallvec::SmallVec;
 
@@ -245,6 +245,7 @@ pub struct FlexContainer {
     pub align_items: AlignItems,
     pub align_content: AlignContent,
     pub direction: Direction,
+	pub overflow_wrap: OverflowWrap,
 }
 
 // 描述节点自身行为的flex布局属性
@@ -279,6 +280,7 @@ impl Default for FlexContainer {
             align_items: Default::default(),
             align_content: AlignContent::FlexStart,
             direction: Default::default(),
+			overflow_wrap: Default::default(),
         }
     }
 }
@@ -446,21 +448,25 @@ pub struct TextContent(pub String, pub Atom);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextStyle {
-    pub color: Color, //颜色
-    pub text_indent: f32,
-    pub text_stroke: Stroke,
-    pub text_align: TextAlign,
-    pub text_shadow: TextShadows, // 缩进， 单位： 像素
-    pub letter_spacing: f32,      //字符间距， 单位：像素
-    pub word_spacing: f32,        //字符间距， 单位：像素
-    pub white_space: WhiteSpace,  //空白处理
-    pub line_height: LineHeight,  //设置行高
-    pub vertical_align: VerticalAlign,
-
-    pub font_style: FontStyle, //	规定字体样式。参阅：font-style 中可能的值。
+	pub font_style: FontStyle, //	规定字体样式。参阅：font-style 中可能的值。
     pub font_weight: usize,    //	规定字体粗细。参阅：font-weight 中可能的值。
     pub font_size: FontSize,   //
     pub font_family: Atom,     //	规定字体系列。参阅：font-family 中可能的值。
+
+    pub line_height: LineHeight,  //设置行高
+	pub letter_spacing: f32,      //字符间距， 单位：像素
+    pub word_spacing: f32,        //字符间距， 单位：像素
+    pub white_space: WhiteSpace,  //空白处理
+
+	pub text_overflow: TextOverflow,
+
+    pub text_indent: f32,
+	pub text_stroke: Stroke,
+	pub vertical_align: VerticalAlign,
+	pub text_align: TextAlign,
+
+	pub color: Color, //颜色
+    pub text_shadow: TextShadows, // 缩进， 单位： 像素
 }
 
 impl Default for TextStyle {
@@ -480,6 +486,7 @@ impl Default for TextStyle {
             font_weight: 500,
             font_size: Default::default(),
             font_family: Default::default(),
+			text_overflow: Default::default(),
         }
     }
 }
@@ -492,6 +499,14 @@ pub struct TextShadow {
     pub v: f32,         //	必需。垂直阴影的位置。允许负值。	测试
     pub blur: f32,      //	可选。模糊的距离。	测试
     pub color: CgColor, //	可选。阴影的颜色。参阅 CSS 颜色值。
+}
+
+#[derive(Debug, Clone, EnumDefault, Serialize, Deserialize)]
+pub enum TextOverflow {
+	None,
+	Clip,
+	Ellipsis,
+	Custom(String),
 }
 
 // TransformWillChange， 用于优化频繁变化的Transform
@@ -987,4 +1002,8 @@ pub enum StyleType {
 	Rotate = 90,
 
 	AsImage = 91,
+
+	TextOverflow = 92,
+
+	OverflowWrap = 93,
 }
