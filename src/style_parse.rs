@@ -1991,7 +1991,7 @@ pub fn parse_style_item_value<'i, 't>(location: SourceLocation, name: CowRcStr<'
 			log::trace!("{:?}", as_image);
 			buffer.push_back(Attribute::AsImage(AsImageType(as_image)));
 		},
-		"text_overflow" => {
+		"text-overflow" => {
 			input.expect_colon()?;
 			let text_overflow = TextOverflow::parse(input)?;
 			log::trace!("{:?}", text_overflow);
