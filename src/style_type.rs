@@ -147,7 +147,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 91
+                    Self::get_type() as u8 + 93
                 }
                 fn size() -> usize {
                     0
@@ -173,7 +173,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 91
+                    Self::get_type() as u8 + 93
                 }
                 fn size() -> usize {
                     0
@@ -199,7 +199,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 91
+                    Self::get_type() as u8 + 93
                 }
                 fn size() -> usize {
                     0
@@ -225,7 +225,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 91
+                    Self::get_type() as u8 + 93
                 }
                 fn size() -> usize {
                     0
@@ -251,7 +251,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 91
+                    Self::get_type() as u8 + 93
                 }
                 fn size() -> usize {
                     0
@@ -278,7 +278,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 91
+                    Self::get_type() as u8 + 93
                 }
                 fn size() -> usize {
                     0
@@ -305,7 +305,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 91
+                    Self::get_type() as u8 + 93
                 }
                 fn size() -> usize {
                     0
@@ -331,7 +331,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 91
+                    Self::get_type() as u8 + 93
                 }
                 fn size() -> usize {
                     0

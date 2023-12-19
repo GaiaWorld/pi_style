@@ -60,66 +60,66 @@ pub enum Attribute {
     Blur(BlurType),                               // 27
     MaskImage(MaskImageType),                     // 28
     MaskImageClip(MaskImageClipType),             // 29
-    Transform(TransformType),                     // 31
-    TransformOrigin(TransformOriginType),         // 32
-    TransformWillChange(TransformWillChangeType), // 33
-    BorderRadius(BorderRadiusType),               // 34
-    ZIndex(ZIndexType),                           // 35
-    Overflow(OverflowType),                       // 36
+    Transform(TransformType),                     // 30
+    TransformOrigin(TransformOriginType),         // 31
+    TransformWillChange(TransformWillChangeType), // 32
+    BorderRadius(BorderRadiusType),               // 33
+    ZIndex(ZIndexType),                           // 34
+    Overflow(OverflowType),                       // 35
 
-    BlendMode(BlendModeType),   // 37
-    Display(DisplayType),       // 38
-    Visibility(VisibilityType), // 39
-    Enable(EnableType),         // 40
+    BlendMode(BlendModeType),   // 36
+    Display(DisplayType),       // 37
+    Visibility(VisibilityType), // 38
+    Enable(EnableType),         // 39
 
-    Width(WidthType),   // 41
-    Height(HeightType), // 42
+    Width(WidthType),   // 40
+    Height(HeightType), // 41
 
-    MarginTop(MarginTopType),       // 43
-    MarginRight(MarginRightType),   // 44
-    MarginBottom(MarginBottomType), // 45
-    MarginLeft(MarginLeftType),     // 46
+    MarginTop(MarginTopType),       // 42
+    MarginRight(MarginRightType),   // 43
+    MarginBottom(MarginBottomType), // 44
+    MarginLeft(MarginLeftType),     // 45
 
-    PaddingTop(PaddingTopType),       // 47
-    PaddingRight(PaddingRightType),   // 48
-    PaddingBottom(PaddingBottomType), // 49
-    PaddingLeft(PaddingLeftType),     // 50
+    PaddingTop(PaddingTopType),       // 46
+    PaddingRight(PaddingRightType),   // 47
+    PaddingBottom(PaddingBottomType), // 48
+    PaddingLeft(PaddingLeftType),     // 49
 
-    BorderTop(BorderTopType),       // 51
-    BorderRight(BorderRightType),   // 52
-    BorderBottom(BorderBottomType), // 53
-    BorderLeft(BorderLeftType),     // 54
+    BorderTop(BorderTopType),       // 50
+    BorderRight(BorderRightType),   // 51
+    BorderBottom(BorderBottomType), // 52
+    BorderLeft(BorderLeftType),     // 53
 
-    PositionTop(PositionTopType),       // 55
-    PositionRight(PositionRightType),   // 56
-    PositionBottom(PositionBottomType), // 57
-    PositionLeft(PositionLeftType),     // 58
+    PositionTop(PositionTopType),       // 54
+    PositionRight(PositionRightType),   // 55
+    PositionBottom(PositionBottomType), // 56
+    PositionLeft(PositionLeftType),     // 57
 
-    MinWidth(MinWidthType),             // 59
-    MinHeight(MinHeightType),           // 60
-    MaxHeight(MaxHeightType),           // 61
-    MaxWidth(MaxWidthType),             // 62
-    Direction(DirectionType),           // 63
-    FlexDirection(FlexDirectionType),   // 64
-    FlexWrap(FlexWrapType),             // 65
-    JustifyContent(JustifyContentType), // 66
-    AlignContent(AlignContentType),     // 67
-    AlignItems(AlignItemsType),         // 68
+    MinWidth(MinWidthType),             // 58
+    MinHeight(MinHeightType),           // 59
+    MaxHeight(MaxHeightType),           // 60
+    MaxWidth(MaxWidthType),             // 61
+    Direction(DirectionType),           // 62
+    FlexDirection(FlexDirectionType),   // 63
+    FlexWrap(FlexWrapType),             // 64
+    JustifyContent(JustifyContentType), // 65
+    AlignContent(AlignContentType),     // 66
+    AlignItems(AlignItemsType),         // 67
 
-    PositionType(PositionTypeType), // 69
-    AlignSelf(AlignSelfType),       // 70
-    FlexShrink(FlexShrinkType),     // 71
-    FlexGrow(FlexGrowType),         // 72
-    AspectRatio(AspectRatioType),   // 73
-    Order(OrderType),               // 74
-    FlexBasis(FlexBasisType),       // 75
-    Opacity(OpacityType),           // 80
+    PositionType(PositionTypeType), // 68
+    AlignSelf(AlignSelfType),       // 69
+    FlexShrink(FlexShrinkType),     // 70
+    FlexGrow(FlexGrowType),         // 71
+    AspectRatio(AspectRatioType),   // 72
+    Order(OrderType),               // 73
+    FlexBasis(FlexBasisType),       // 74
+    Opacity(OpacityType),           // 75
 
-    TextContent(TextContentType), // 81
+    TextContent(TextContentType), // 76
 
-    VNode(VNodeType), // 82
+    VNode(VNodeType), // 77
 
-    TransformFunc(TransformFuncType), // 83
+    TransformFunc(TransformFuncType), // 78
 
     AnimationName(AnimationNameType),                     // 79
     AnimationDuration(AnimationDurationType),             // 80
