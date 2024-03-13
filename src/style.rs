@@ -115,6 +115,13 @@ impl Default for CgColor {
 #[derive(Default)]
 pub struct Node;
 
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+pub struct Transition {
+	pub property: SmallVec<[usize; 1]>, // 指定过度影响的属性
+	pub duration: SmallVec<[Time; 1]>,                           // 指定需要多少毫秒完成过度
+	pub delay: SmallVec<[Time; 1]>,                    // 启动过度前的延迟间隔。
+    pub timing_function: SmallVec<[AnimationTimingFunction; 1]>, // 插值函数
+}
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct Animation {
@@ -127,6 +134,7 @@ pub struct Animation {
     pub fill_mode: SmallVec<[AnimationFillMode; 1]>,   // 规定当动画不播放时（当动画完成时，或当动画有一个延迟未开始播放时），要应用到元素的样式。
     pub play_state: SmallVec<[AnimationPlayState; 1]>, // 指定动画是否正在运行或已暂停
 }
+
 
 #[derive(Debug, Default, Serialize, Clone, Deserialize)]
 pub struct AnimationName {
@@ -639,13 +647,24 @@ pub struct Stroke {
     pub color: CgColor,     //	描边颜色
 }
 
+// #[derive(Default, Debug, Clone, Serialize, Deserialize)]
+// pub struct Outline {
+//     pub width: NotNan<f32>, //	描边宽度
+//     pub color: CgColor,     //	外发光颜色
+// }
+
 // 图像填充的方式
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum FitType {
+	/// 保留原有元素内容的长度和宽度，也就是说内容不会被重置。
     None,
+	// 	默认，不保证保持原有的比例，内容拉伸填充整个内容容器。
     Fill,
+	/// 保持原有尺寸比例。内容被缩放。
     Contain,
+	/// 保持原有尺寸比例。但部分内容可能被剪切
     Cover,
+	/// 保持原有尺寸比例。内容的尺寸与 none 或 contain 中的一个相同，取决于它们两个之间谁得到的对象尺寸会更小一些
     ScaleDown,
     // Repeat,
     // RepeatX,
@@ -662,9 +681,9 @@ pub enum ImageRepeatOption {
     Stretch,
     /// 源图像的边缘区域被平铺（重复）以填充每个边界之间的间隙。可以修剪瓷砖以实现适当的配合。
     Repeat,
-    /// 源图像的边缘区域被平铺（重复）以填充每个边界之间的间隙。可以拉伸瓷砖以实现适当的配合。
+    /// 类似 repeat 值。如果无法完整平铺所有图像，则对图像进行缩放以适应区域。。
     Round,
-    /// 源图像的边缘区域被平铺（重复）以填充每个边界之间的间隙。可以缩小瓷砖以实现适当的配合。
+    /// 类似 repeat 值。如果无法完整平铺所有图像，扩展空间会分布在图像周围
     Space,
 }
 
@@ -818,13 +837,13 @@ impl WhiteSpace {
     }
 }
 
-#[derive(Debug, Clone, Copy, EnumDefault, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, EnumDefault, Hash, Serialize, Deserialize, PartialEq, Eq)]
 pub enum FontStyle {
     Normal,  //	默认值。标准的字体样式。
     Ttalic,  //	斜体的字体样式。
     Oblique, //	倾斜的字体样式。
 }
-#[derive(Debug, Clone, Copy, EnumDefault, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, EnumDefault, Hash, Serialize, Deserialize, PartialEq, Eq)]
 pub enum VerticalAlign {
     Top,
     Middle,
@@ -890,120 +909,174 @@ pub enum AsImage {
 // 枚举样式的类型
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum StyleType {
-    BackgroundRepeat = 1,
-    FontStyle = 2,
-    FontWeight = 3,
-    FontSize = 4,
-    FontFamily = 5,
-    LetterSpacing = 6,
-    WordSpacing = 7,
-    LineHeight = 8,
-    TextIndent = 9,
-    WhiteSpace = 10,
-    TextAlign = 11,
-    VerticalAlign = 12,
-    Color = 13,
-    TextStroke = 14,
-    TextShadow = 15,
+    BackgroundRepeat = 0,
+    FontStyle = 1,
+    FontWeight = 2,
+    FontSize = 3,
+    FontFamily = 4,
+    LetterSpacing = 5,
+    WordSpacing = 6,
+    LineHeight = 7,
+    TextIndent = 8,
+    WhiteSpace = 9,
+    TextAlign = 10,
+    VerticalAlign = 11,
+    Color = 12,
+    TextStroke = 13,
+    TextShadow = 14,
 
-    BackgroundImage = 16,
-    BackgroundImageClip = 17,
-    ObjectFit = 18,
+    BackgroundImage = 15,
+    BackgroundImageClip = 16,
+    ObjectFit = 17,
 
-    BackgroundColor = 19,
-    BoxShadow = 20,
+    BackgroundColor = 18,
+    BoxShadow = 19,
 
-    BorderImage = 21,
-    BorderImageClip = 22,
-    BorderImageSlice = 23,
-    BorderImageRepeat = 24,
+    BorderImage = 20,
+    BorderImageClip = 21,
+    BorderImageSlice = 22,
+    BorderImageRepeat = 23,
 
-    BorderColor = 25,
+    BorderColor = 24,
 
-    Hsi = 26,
-    Blur = 27,
-    MaskImage = 28,
-    MaskImageClip = 29,
+    Hsi = 25,
+    Blur = 26,
+    MaskImage = 27,
+    MaskImageClip = 28,
 
-    Transform = 30,
-    TransformOrigin = 31,
-    TransformWillChange = 32,
+    Transform = 29,
+    TransformOrigin = 30,
+    TransformWillChange = 31,
 
-    BorderRadius = 33,
-    ZIndex = 34,
-    Overflow = 35,
-    BlendMode = 36,
+    BorderRadius = 32,
+    ZIndex = 33,
+    Overflow = 34,
+    BlendMode = 35,
 
-    Display = 37,
-    Visibility = 38,
-    Enable = 39,
+    Display = 36,
+    Visibility = 37,
+    Enable = 38,
 
-    Width = 40,
-    Height = 41,
+    Width = 39,
+    Height = 40,
 
-    MarginTop = 42,
-    MarginRight = 43,
-    MarginBottom = 44,
-    MarginLeft = 45,
+    MarginTop = 41,
+    MarginRight = 42,
+    MarginBottom = 43,
+    MarginLeft = 44,
 
-    PaddingTop = 46,
-    PaddingRight = 47,
-    PaddingBottom = 48,
-    PaddingLeft = 49,
+    PaddingTop = 45,
+    PaddingRight = 46,
+    PaddingBottom = 47,
+    PaddingLeft = 48,
 
-    BorderTop = 50,
-    BorderRight = 51,
-    BorderBottom = 52,
-    BorderLeft = 53,
+    BorderTop = 49,
+    BorderRight = 50,
+    BorderBottom = 51,
+    BorderLeft = 52,
 
-    PositionTop = 54,
-    PositionRight = 55,
-    PositionBottom = 56,
-    PositionLeft = 57,
+    PositionTop = 53,
+    PositionRight = 54,
+    PositionBottom = 55,
+    PositionLeft = 56,
 
-    MinWidth = 58,
-    MinHeight = 59,
-    MaxHeight = 60,
-    MaxWidth = 61,
+    MinWidth = 57,
+    MinHeight = 58,
+    MaxHeight = 59,
+    MaxWidth = 60,
 
-    Direction = 62,
-    FlexDirection = 63,
-    FlexWrap = 64,
-    JustifyContent = 65,
-    AlignContent = 66,
-    AlignItems = 67,
+    Direction = 61,
+    FlexDirection = 62,
+    FlexWrap = 63,
+    JustifyContent = 64,
+    AlignContent = 65,
+    AlignItems = 66,
 
-    PositionType = 68,
-    AlignSelf = 69,
-    FlexShrink = 70,
-    FlexGrow = 71,
-    AspectRatio = 72,
-    Order = 73,
-    FlexBasis = 74,
+    PositionType = 67,
+    AlignSelf = 68,
+    FlexShrink = 69,
+    FlexGrow = 70,
+    AspectRatio = 71,
+    Order = 72,
+    FlexBasis = 73,
 
-    Opacity = 75,
-    TextContent = 76,
-    NodeState = 77,
+    Opacity = 74,
+    TextContent = 75,
+    NodeState = 76,
 
-    TransformFunc = 78,
+    // TransformFunc = 78,
 
-    AnimationName = 79,
-    AnimationDuration = 80,
-    AnimationTimingFunction = 81,
-    AnimationDelay = 82,
-    AnimationIterationCount = 83,
-    AnimationDirection = 84,
-    AnimationFillMode = 85,
-    AnimationPlayState = 86,
+    AnimationName = 77,
+    AnimationDuration = 78,
+    AnimationTimingFunction = 79,
+    AnimationDelay = 80,
+    AnimationIterationCount = 81,
+    AnimationDirection = 82,
+    AnimationFillMode = 83,
+    AnimationPlayState = 84,
 
-	ClipPath = 87,
-	Translate = 88,
-	Scale = 89,
-	Rotate = 90,
+	ClipPath = 85,
+	Translate = 86,
+	Scale = 87,
+	Rotate = 88,
 
-	AsImage = 91,
+	AsImage = 89,
 
-	TextOverflow = 92,
+	TextOverflow = 90,
 
-	OverflowWrap = 93,
+	OverflowWrap = 91,
+
+	TransitionProperty = 92,
+	TransitionDuration= 93,
+	TransitionTimingFunction = 94,
+	TransitionDelay = 95,
 }
+
+// // 可插值属性
+// pub const INTERPOLABLE_PROPERTY: usize = StyleType::BackgroundRepeat as usize | 
+// 	StyleType::Color |
+// 	StyleType::BackgroundImageClip |
+// 	StyleType::BackgroundColor |
+// 	StyleType::BorderColor |
+// 	StyleType::Hsi |
+// 	StyleType::Blur |
+// 	StyleType::Transform |
+// 	StyleType::BorderRadius |
+
+//     StyleType::Width |
+//     StyleType::Height |
+
+//     StyleType::MarginTop |
+//     StyleType::MarginRight |
+//     StyleType::MarginBottom |
+//     StyleType::MarginLeft |
+
+//     StyleType::PaddingTop |
+//     StyleType::PaddingRight |
+//     StyleType::PaddingBottom |
+//     StyleType::PaddingLeft |
+
+//     StyleType::BorderTop |
+//     StyleType::BorderRight |
+//     StyleType::BorderBottom |
+//     StyleType::BorderLeft |
+
+//     StyleType::PositionTop |
+//     StyleType::PositionRight |
+//     StyleType::PositionBottom |
+//     StyleType::PositionLeft |
+
+//     StyleType::MinWidth |
+//     StyleType::MinHeight |
+//     StyleType::MaxHeight |
+//     StyleType::MaxWidth |
+
+//     StyleType::Opacity |
+
+//     StyleType::TransformFunc |
+// 	StyleType::Translate |
+// 	StyleType::Scale |
+// 	StyleType::Rotate;
+
+
+

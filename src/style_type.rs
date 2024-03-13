@@ -118,6 +118,24 @@ macro_rules! write_buffer {
     };
 }
 
+macro_rules! write_reset {
+    () => {
+        unsafe fn write(&self, buffer: &mut Vec<u8>) {
+            let ty_size = std::mem::size_of::<StyleType>();
+            // let value_size = <Self as Attr>::size();
+            let len = buffer.len();
+            buffer.reserve(ty_size);
+            buffer.set_len(len + ty_size);
+
+			
+
+            let ty = Self::get_style_index();
+            std::ptr::copy_nonoverlapping(&ty as *const u8, buffer.as_mut_ptr().add(len), ty_size);
+            // forget(self)
+        }
+    };
+}
+
 macro_rules! impl_style {
     ($struct_name: ident) => {
         #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -147,13 +165,13 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 93
+                    Self::get_type() as u8 + 96
                 }
                 fn size() -> usize {
                     0
                 }
                 get_type!(StyleType::$ty);
-                write_buffer!();
+                write_reset!();
             }
         }
     };
@@ -173,13 +191,13 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 93
+                    Self::get_type() as u8 + 96
                 }
                 fn size() -> usize {
                     0
                 }
                 get_type!(StyleType::$ty);
-                write_buffer!();
+                write_reset!();
             }
         }
     };
@@ -199,13 +217,13 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 93
+                    Self::get_type() as u8 + 96
                 }
                 fn size() -> usize {
                     0
                 }
                 get_type!(StyleType::$ty);
-                write_buffer!();
+                write_reset!();
             }
         }
     };
@@ -225,13 +243,13 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 93
+                    Self::get_type() as u8 + 96
                 }
                 fn size() -> usize {
                     0
                 }
                 get_type!(StyleType::$ty);
-                write_buffer!();
+                write_reset!();
             }
         }
     };
@@ -251,13 +269,13 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 93
+                    Self::get_type() as u8 + 96
                 }
                 fn size() -> usize {
                     0
                 }
                 get_type!(StyleType::$ty);
-                write_buffer!();
+                write_reset!();
             }
         }
     };
@@ -278,13 +296,13 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 93
+                    Self::get_type() as u8 + 96
                 }
                 fn size() -> usize {
                     0
                 }
                 get_type!(StyleType::$ty);
-                write_buffer!();
+                write_reset!();
             }
         }
     };
@@ -305,13 +323,13 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 93
+                    Self::get_type() as u8 + 96
                 }
                 fn size() -> usize {
                     0
                 }
                 get_type!(StyleType::$ty);
-                write_buffer!();
+                write_reset!();
             }
         }
     };
@@ -331,13 +349,13 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 93
+                    Self::get_type() as u8 + 96
                 }
                 fn size() -> usize {
                     0
                 }
                 get_type!(StyleType::$ty);
-                write_buffer!();
+                write_reset!();
             }
         }
     };
@@ -403,7 +421,6 @@ impl_style!(@func DisplayType, show, set_display, get_display, Display, Display)
 impl_style!(@func VisibilityType, show, set_visibility, get_visibility, Visibility, bool);
 impl_style!(@func EnableType, show, set_enable, get_enable, Enable, Enable);
 
-impl_style!(@func TransformFuncType, transform, add_func, TransformFunc, TransformFunc);
 impl_style!(@func VNodeType, node_state, set_vnode, NodeState, bool);
 
 impl_style!(TransformWillChangeType, transform_will_change, TransformWillChange, bool);
@@ -493,6 +510,17 @@ impl_style!(
     AnimationPlayState,
     SmallVec<[AnimationPlayState; 1]>
 );
+
+impl_style!(TransitionPropertyType, transition, property, TransitionProperty, SmallVec<[usize; 1]>);
+impl_style!(TransitionDurationType, transition, duration, TransitionDuration, SmallVec<[Time; 1]>);
+impl_style!(
+    TransitionTimingFunctionType,
+    transition,
+    timing_function,
+    TransitionTimingFunction,
+    SmallVec<[AnimationTimingFunction; 1]>
+);
+impl_style!(TransitionDelayType, transition, delay, TransitionDelay, SmallVec<[Time; 1]>);
 
 impl_style!(AsImageType, as_image, AsImage, AsImage);
 
@@ -617,7 +645,6 @@ impl_interpolation!(@keep, DisplayType);
 impl_interpolation!(@keep, VisibilityType);
 impl_interpolation!(@keep, EnableType);
 
-impl_interpolation!(@keep, TransformFuncType);
 impl_interpolation!(@keep, VNodeType);
 
 impl_interpolation!(@keep, TransformWillChangeType);
@@ -1139,4 +1166,14 @@ impl Add for ScaleType {
 
 impl FrameValueScale for ScaleType {
 	fn scale(&self, rhs: KeyFrameCurveValue) -> Self { Self([AnimatableValue::scale(&self.0[0], rhs), AnimatableValue::scale(&self.0[1], rhs)]) }
+}
+
+
+impl Add for EmptyType {
+	type Output = Self;
+	fn add(self, rhs: Self) -> Self::Output { rhs }
+}
+
+impl FrameValueScale for EmptyType {
+	fn scale(&self, _rhs: KeyFrameCurveValue) -> Self { Self }
 }

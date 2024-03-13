@@ -20,124 +20,128 @@ use thiserror::Error;
 use crate::style::{
     Animation, AnimationDirection, AnimationFillMode, AnimationPlayState, AnimationTimingFunction, BlendMode, BorderImageSlice, BorderRadius,
     BoxShadow, CgColor, Color, ColorAndPosition, Enable, FitType, FontSize, Hsi, ImageRepeat, ImageRepeatOption, IterationCount, LengthUnit,
-    LineHeight, LinearGradientColor, MaskImage, NotNanRect, Stroke, TextAlign, TextShadow, Time, TransformFunc, TransformOrigin, WhiteSpace, AnimationName, BaseShape, Center, TextContent, AsImage, TextOverflow,
+    LineHeight, LinearGradientColor, MaskImage, NotNanRect, Stroke, TextAlign, TextShadow, Time, TransformFunc, TransformOrigin, WhiteSpace, AnimationName, BaseShape, Center, TextContent, AsImage, TextOverflow, Transition,
 };
+use crate::style::StyleType;
 
 use super::style_type::*;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum Attribute {
-    BackgroundRepeat(BackgroundRepeatType), // 0 empty 占位， 无实际作用
-    FontStyle(FontStyleType),               // 2
-    FontWeight(FontWeightType),             // 3
-    FontSize(FontSizeType),                 // 4
-    FontFamily(FontFamilyType),             // 5
-    LetterSpacing(LetterSpacingType),       // 6
-    WordSpacing(WordSpacingType),           // 7
-    LineHeight(LineHeightType),             // 8
-    TextIndent(TextIndentType),             // 9
-    WhiteSpace(WhiteSpaceType),             // 10
+    BackgroundRepeat(BackgroundRepeatType), // 0 
+    FontStyle(FontStyleType),               // 1
+    FontWeight(FontWeightType),             // 2
+    FontSize(FontSizeType),                 // 3
+    FontFamily(FontFamilyType),             // 4
+    LetterSpacing(LetterSpacingType),       // 5
+    WordSpacing(WordSpacingType),           // 6
+    LineHeight(LineHeightType),             // 7
+    TextIndent(TextIndentType),             // 8
+    WhiteSpace(WhiteSpaceType),             // 9
 
-    TextAlign(TextAlignType),         // 11
-    VerticalAlign(VerticalAlignType), // 12
-    Color(ColorType),                 // 13
-    TextStroke(TextStrokeType),       // 14
-    TextShadow(TextShadowType),       // 15
+    TextAlign(TextAlignType),         // 10
+    VerticalAlign(VerticalAlignType), // 11
+    Color(ColorType),                 // 12
+    TextStroke(TextStrokeType),       // 13
+    TextShadow(TextShadowType),       // 14
 
-    BackgroundImage(BackgroundImageType),         // 16
-    BackgroundImageClip(BackgroundImageClipType), // 17
-    ObjectFit(ObjectFitType),                     // 18
-    BackgroundColor(BackgroundColorType),         // 19
-    BoxShadow(BoxShadowType),                     // 20
-    BorderImage(BorderImageType),                 // 21
-    BorderImageClip(BorderImageClipType),         // 22
-    BorderImageSlice(BorderImageSliceType),       // 23
-    BorderImageRepeat(BorderImageRepeatType),     // 24
+    BackgroundImage(BackgroundImageType),         // 15
+    BackgroundImageClip(BackgroundImageClipType), // 16
+    ObjectFit(ObjectFitType),                     // 17
+    BackgroundColor(BackgroundColorType),         // 18
+    BoxShadow(BoxShadowType),                     // 19
+    BorderImage(BorderImageType),                 // 20
+    BorderImageClip(BorderImageClipType),         // 21
+    BorderImageSlice(BorderImageSliceType),       // 22
+    BorderImageRepeat(BorderImageRepeatType),     // 23
 
-    BorderColor(BorderColorType), // 25
+    BorderColor(BorderColorType), // 24
 
-    Hsi(HsiType),                                 // 26
-    Blur(BlurType),                               // 27
-    MaskImage(MaskImageType),                     // 28
-    MaskImageClip(MaskImageClipType),             // 29
-    Transform(TransformType),                     // 30
-    TransformOrigin(TransformOriginType),         // 31
-    TransformWillChange(TransformWillChangeType), // 32
-    BorderRadius(BorderRadiusType),               // 33
-    ZIndex(ZIndexType),                           // 34
-    Overflow(OverflowType),                       // 35
+    Hsi(HsiType),                                 // 25
+    Blur(BlurType),                               // 26
+    MaskImage(MaskImageType),                     // 27
+    MaskImageClip(MaskImageClipType),             // 28
+    Transform(TransformType),                     // 29
+    TransformOrigin(TransformOriginType),         // 30
+    TransformWillChange(TransformWillChangeType), // 31
+    BorderRadius(BorderRadiusType),               // 32
+    ZIndex(ZIndexType),                           // 33
+    Overflow(OverflowType),                       // 34
 
-    BlendMode(BlendModeType),   // 36
-    Display(DisplayType),       // 37
-    Visibility(VisibilityType), // 38
-    Enable(EnableType),         // 39
+    BlendMode(BlendModeType),   // 35
+    Display(DisplayType),       // 36
+    Visibility(VisibilityType), // 37
+    Enable(EnableType),         // 38
 
-    Width(WidthType),   // 40
-    Height(HeightType), // 41
+    Width(WidthType),   // 39
+    Height(HeightType), // 40
 
-    MarginTop(MarginTopType),       // 42
-    MarginRight(MarginRightType),   // 43
-    MarginBottom(MarginBottomType), // 44
-    MarginLeft(MarginLeftType),     // 45
+    MarginTop(MarginTopType),       // 41
+    MarginRight(MarginRightType),   // 42
+    MarginBottom(MarginBottomType), // 43
+    MarginLeft(MarginLeftType),     // 44
 
-    PaddingTop(PaddingTopType),       // 46
-    PaddingRight(PaddingRightType),   // 47
-    PaddingBottom(PaddingBottomType), // 48
-    PaddingLeft(PaddingLeftType),     // 49
+    PaddingTop(PaddingTopType),       // 45
+    PaddingRight(PaddingRightType),   // 46
+    PaddingBottom(PaddingBottomType), // 47
+    PaddingLeft(PaddingLeftType),     // 48
 
-    BorderTop(BorderTopType),       // 50
-    BorderRight(BorderRightType),   // 51
-    BorderBottom(BorderBottomType), // 52
-    BorderLeft(BorderLeftType),     // 53
+    BorderTop(BorderTopType),       // 49
+    BorderRight(BorderRightType),   // 50
+    BorderBottom(BorderBottomType), // 51
+    BorderLeft(BorderLeftType),     // 52
 
-    PositionTop(PositionTopType),       // 54
-    PositionRight(PositionRightType),   // 55
-    PositionBottom(PositionBottomType), // 56
-    PositionLeft(PositionLeftType),     // 57
+    PositionTop(PositionTopType),       // 53
+    PositionRight(PositionRightType),   // 54
+    PositionBottom(PositionBottomType), // 55
+    PositionLeft(PositionLeftType),     // 56
 
-    MinWidth(MinWidthType),             // 58
-    MinHeight(MinHeightType),           // 59
-    MaxHeight(MaxHeightType),           // 60
-    MaxWidth(MaxWidthType),             // 61
-    Direction(DirectionType),           // 62
-    FlexDirection(FlexDirectionType),   // 63
-    FlexWrap(FlexWrapType),             // 64
-    JustifyContent(JustifyContentType), // 65
-    AlignContent(AlignContentType),     // 66
-    AlignItems(AlignItemsType),         // 67
+    MinWidth(MinWidthType),             // 57
+    MinHeight(MinHeightType),           // 58
+    MaxHeight(MaxHeightType),           // 58
+    MaxWidth(MaxWidthType),             // 60
+    Direction(DirectionType),           // 61
+    FlexDirection(FlexDirectionType),   // 62
+    FlexWrap(FlexWrapType),             // 63
+    JustifyContent(JustifyContentType), // 64
+    AlignContent(AlignContentType),     // 65
+    AlignItems(AlignItemsType),         // 66
 
-    PositionType(PositionTypeType), // 68
+    PositionType(PositionTypeType), // 67
     AlignSelf(AlignSelfType),       // 69
-    FlexShrink(FlexShrinkType),     // 70
-    FlexGrow(FlexGrowType),         // 71
-    AspectRatio(AspectRatioType),   // 72
-    Order(OrderType),               // 73
-    FlexBasis(FlexBasisType),       // 74
-    Opacity(OpacityType),           // 75
+    FlexShrink(FlexShrinkType),     // 69
+    FlexGrow(FlexGrowType),         // 70
+    AspectRatio(AspectRatioType),   // 71
+    Order(OrderType),               // 72
+    FlexBasis(FlexBasisType),       // 73
+    Opacity(OpacityType),           // 74
 
-    TextContent(TextContentType), // 76
+    TextContent(TextContentType), // 75
 
-    VNode(VNodeType), // 77
+    VNode(VNodeType), // 76
 
-    TransformFunc(TransformFuncType), // 78
+    AnimationName(AnimationNameType),                     // 77
+    AnimationDuration(AnimationDurationType),             // 78
+    AnimationTimingFunction(AnimationTimingFunctionType), // 79
+    AnimationDelay(AnimationDelayType),                   // 80
+    AnimationIterationCount(AnimationIterationCountType), // 81
+    AnimationDirection(AnimationDirectionType),           // 82
+    AnimationFillMode(AnimationFillModeType),             // 83
+    AnimationPlayState(AnimationPlayStateType),           // 84
+	ClipPath(ClipPathType),   // 85
+	Translate(TranslateType),                     // 86
+	Scale(ScaleType),                     // 87
+	Rotate(RotateType),                     // 88
 
-    AnimationName(AnimationNameType),                     // 79
-    AnimationDuration(AnimationDurationType),             // 80
-    AnimationTimingFunction(AnimationTimingFunctionType), // 81
-    AnimationDelay(AnimationDelayType),                   // 82
-    AnimationIterationCount(AnimationIterationCountType), // 83
-    AnimationDirection(AnimationDirectionType),           // 84
-    AnimationFillMode(AnimationFillModeType),             // 85
-    AnimationPlayState(AnimationPlayStateType),           // 86
-	ClipPath(ClipPathType),   // 87
-	Translate(TranslateType),                     // 88
-	Scale(ScaleType),                     // 89
-	Rotate(RotateType),                     // 90
+	AsImage(AsImageType),                     // 89
 
-	AsImage(AsImageType),                     // 91
+	TextOverflow(TextOverflowType), // 90
+	OverflowWrap(OverflowWrapType), // 91
 
-	TextOverflow(TextOverflowType), // 92 
-	OverflowWrap(OverflowWrapType), // 93
+	TransitionProperty(TransitionPropertyType),                     // 92
+    TransitionDuration(TransitionDurationType),             // 93
+    TransitionTimingFunction(TransitionTimingFunctionType), // 94
+    TransitionDelay(TransitionDelayType),                   // 95
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
@@ -511,10 +515,6 @@ pub fn style_to_buffer(style_buffer: &mut Vec<u8>, mut style: Attribute,  class_
 			class_meta.class_style_mark.set(VNodeType::get_type() as usize, true);
 			r.write(style_buffer);
 		},
-		Attribute::TransformFunc(r) => unsafe {
-			class_meta.class_style_mark.set(TransformFuncType::get_type() as usize, true);
-			r.write(style_buffer);
-		},
 		Attribute::AnimationName(r) => unsafe {
 			class_meta.class_style_mark.set(AnimationNameType::get_type() as usize, true);
 			r.write(style_buffer);
@@ -573,6 +573,22 @@ pub fn style_to_buffer(style_buffer: &mut Vec<u8>, mut style: Attribute,  class_
 		},
 		Attribute::OverflowWrap(r) => unsafe {
 			class_meta.class_style_mark.set(OverflowWrapType::get_type() as usize, true);
+			r.write(style_buffer);
+		},
+		Attribute::TransitionProperty(r) => unsafe {
+			class_meta.class_style_mark.set(TransitionPropertyType::get_type() as usize, true);
+			r.write(style_buffer);
+		},
+		Attribute::TransitionDuration(r) => unsafe {
+			class_meta.class_style_mark.set(TransitionDurationType::get_type() as usize, true);
+			r.write(style_buffer);
+		},
+		Attribute::TransitionTimingFunction(r) => unsafe {
+			class_meta.class_style_mark.set(TransitionTimingFunctionType::get_type() as usize, true);
+			r.write(style_buffer);
+		},
+		Attribute::TransitionDelay(r) => unsafe {
+			class_meta.class_style_mark.set(TransitionDelayType::get_type() as usize, true);
 			r.write(style_buffer);
 		},
 	}
@@ -1913,7 +1929,7 @@ pub fn parse_style_item_value<'i, 't>(location: SourceLocation, name: CowRcStr<'
         }
         "animation-name" => {
             input.expect_colon()?;
-            let ty = AnimationNameType(AnimationName{ scope_hash, value: parse_comma_separated::<_, _, BasicParseError<'i>>(input, |input| Ok(Atom::from(input.expect_ident()?.as_ref())))?});
+            let ty = AnimationNameType(AnimationName{ scope_hash, value: parse_comma_separated::<_, _>(input, |input| Ok(Atom::from(input.expect_ident()?.as_ref())))?});
             log::trace!("{:?}", ty);
             buffer.push_back(Attribute::AnimationName(ty));
         }
@@ -1978,7 +1994,45 @@ pub fn parse_style_item_value<'i, 't>(location: SourceLocation, name: CowRcStr<'
                 buffer.push_back(Attribute::AnimationFillMode(AnimationFillModeType(animations.fill_mode)));
                 buffer.push_back(Attribute::AnimationPlayState(AnimationPlayStateType(animations.play_state)));
             }
+        },
+		"transition" => {
+			input.expect_colon()?;
+            let transition = Transition::parse(input)?;
+            log::trace!("{:?}", transition);
+            if transition.property.len() > 0 {
+                buffer.push_back(Attribute::TransitionProperty(TransitionPropertyType(transition.property)));
+                buffer.push_back(Attribute::TransitionDuration(TransitionDurationType(transition.duration)));
+				buffer.push_back(Attribute::TransitionDelay(TransitionDelayType(transition.delay)));
+                buffer.push_back(Attribute::TransitionTimingFunction(TransitionTimingFunctionType(
+                    transition.timing_function,
+                )));
+            }
+		},
+		"transition-property" => {
+            input.expect_colon()?;
+            let ty = TransitionPropertyType(parse_comma_separated(input, parse_transation_property)?);
+            log::trace!("{:?}", ty);
+            buffer.push_back(Attribute::TransitionProperty(ty));
         }
+        "transition-duration" => {
+            input.expect_colon()?;
+            let ty = TransitionDurationType(parse_comma_separated(input, Time::parse)?);
+            log::trace!("{:?}", ty);
+            buffer.push_back(Attribute::TransitionDuration(ty));
+        }
+        "transition-timing-function" => {
+            input.expect_colon()?;
+            let ty = TransitionTimingFunctionType(parse_comma_separated(input, AnimationTimingFunction::parse)?);
+            log::trace!("{:?}", ty);
+            buffer.push_back(Attribute::TransitionTimingFunction(ty));
+        }
+        "transition-delay" => {
+            input.expect_colon()?;
+            let ty = TransitionDelayType(parse_comma_separated(input, Time::parse)?);
+            log::trace!("{:?}", ty);
+            buffer.push_back(Attribute::TransitionDelay(ty));
+        }
+
 		"clip-path" => {
 			input.expect_colon()?;
 			let shape = BaseShape::parse(input)?;
@@ -2054,7 +2108,7 @@ pub fn parse_style_item_value<'i, 't>(location: SourceLocation, name: CowRcStr<'
 pub fn parse_animation<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Animation, TokenParseError<'i>> {
 	
     let mut animations = Animation::default();
-    parse_comma_separated::<_, (), TokenParseError<'i>>(input, |input| {
+    parse_comma_separated::<_, ()>(input, |input| {
         let mut has_duration = false;
         let location = input.current_source_location();
         let mut name = Atom::from("");
@@ -2119,55 +2173,9 @@ pub fn parse_animation<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Animation, 
                     }
                 }
                 Token::Function(name) => {
-                    timing_function = match name.as_ref() {
-                        "cubic-bezier" => input.parse_nested_block(|input| {
-                            Ok(AnimationTimingFunction::CubicBezier(
-                                input.expect_number()?,
-                                {
-                                    input.expect_comma()?;
-                                    input.expect_number()?
-                                },
-                                {
-                                    input.expect_comma()?;
-                                    input.expect_number()?
-                                },
-                                {
-                                    input.expect_comma()?;
-                                    input.expect_number()?
-                                },
-                            ))
-                        })?,
-                        "linear" => {
-							AnimationTimingFunction::Linear
-                        //     // input.parse_nested_block(|input| {
-
-                        //     // })?
-                        //     // TODO
-                        //     return Err(location.new_custom_error(token.clone()));
-                        },
-                        "steps" => input.parse_nested_block::<_, _, TokenErrorsInfo<'i>>(|input| {
-                            let location = input.current_source_location();
-                            Ok(AnimationTimingFunction::Step(input.expect_number()? as usize, {
-                                if let Ok(_r) = input.expect_comma() {
-                                    let p = input.expect_ident()?;
-                                    match p.as_ref() {
-                                        "jump-start" | "start" => EStepMode::JumpStart,
-                                        "jump-end" | "end" => EStepMode::JumpEnd,
-                                        "jump-none" => EStepMode::JumpNone,
-                                        "jump-both" => EStepMode::JumpEnd,
-                                        _ => return Err(TokenParseError::from_expect(location, "jump-start | start | jump-end | end | jump-none | jump-both", Token::Ident(p.clone())))?,
-                                    }
-                                } else {
-                                    EStepMode::JumpStart
-                                }
-                            }))
-                        })?,
-                        _ => {
-							continue; 
-							// return Err(TokenParseError::from_expect(location, "cubic-bezier | steps | jump-end | end | jump-none | jump-both", token.clone()))?
-						},
-                    }
-                }
+					let name = unsafe{transmute(name.clone())};
+					timing_function = parse_timing_function(input, name)?;
+				},
 				// 支持老版本gui的写法， 小于0表示无穷次迭代
                 Token::Number { value, .. } => if *value < 0.0 {
 					iteration_count = IterationCount( f32::INFINITY);
@@ -2177,18 +2185,193 @@ pub fn parse_animation<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Animation, 
                 _ => break, // 可能是分号，在这里结束解析
             };
         }
-        animations.name.value.push(name);
-        animations.duration.push(duration);
-        animations.timing_function.push(timing_function);
-        animations.iteration_count.push(iteration_count);
-        animations.delay.push(delay);
-        animations.direction.push(direction);
-        animations.fill_mode.push(fill_mode);
-        animations.play_state.push(play_state);
+
+		animations.name.value.push(name.clone());
+		animations.duration.push(duration);
+		animations.timing_function.push(timing_function.clone());
+		animations.iteration_count.push(iteration_count);
+		animations.delay.push(delay);
+		animations.direction.push(direction);
+		animations.fill_mode.push(fill_mode.clone());
+		animations.play_state.push(play_state.clone());
+      
         Ok(())
     })?;
     Ok(animations)
 }
+
+impl StyleParse for Transition {
+    fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, TokenParseError<'i>> {
+		let mut transition = Transition::default();
+		parse_comma_separated::<_, ()>(input, |input| {
+			let mut has_duration = false;
+			let location = input.current_source_location();
+			let mut property = 0; // 属性id
+			let mut duration = Time::default();
+			let mut timing_function = AnimationTimingFunction::default();
+			let mut delay = Time::default();
+			loop {
+				let token = match input.next() {
+					Ok(r) => r,
+					Err(_r) => break,
+				};
+
+				log::warn!("token===={:?}", token);
+
+				
+				match token {
+					Token::Ident(r) => {
+						match parse_transation_property1(r) {
+							Ok(r) => property = r,
+							_ => {
+								match r.as_ref() {
+									"ease" => timing_function = AnimationTimingFunction::CubicBezier(0.25, 0.1, 0.25, 1.0),
+									"ease-in" => timing_function = AnimationTimingFunction::CubicBezier(0.42, 0.0, 1.0, 1.0),
+									"ease-out" => timing_function = AnimationTimingFunction::CubicBezier(0.0, 0.0, 0.58, 1.0),
+									"ease-in-out" => timing_function = AnimationTimingFunction::CubicBezier(0.42, 0.0, 0.58, 1.0),
+									"linear" => timing_function = AnimationTimingFunction::Linear,
+									"step" => timing_function = AnimationTimingFunction::Step(1, EStepMode::JumpEnd), // 兼容曾经不规范的写法，移除？TODO
+									"step-start" => timing_function = AnimationTimingFunction::Step(1, EStepMode::JumpStart),
+									"step-end" => timing_function = AnimationTimingFunction::Step(1, EStepMode::JumpEnd),
+		
+									_ => (), // 其他属性忽略
+								}
+							}
+						}
+					},
+					Token::Dimension { value, unit, .. } => {						let time = if unit.as_ref() == "s" {
+							Time((value * 1000.0) as usize)
+						} else if unit.as_ref() == "ms" {
+							Time(*value as usize)
+						} else {
+							return Err(TokenParseError::from_expect(location, "<time>", token.clone()));
+						};
+						if has_duration {
+							delay = time;
+						} else {
+							duration = time;
+							has_duration = true;
+						}
+					}
+					Token::Function(name) => {
+						let name = unsafe{transmute(name.clone())};
+						timing_function = parse_timing_function(input, name)?;
+					}
+					_ => break, // 可能是分号，在这里结束解析
+				};
+			}
+
+			transition.property.push(property);
+			transition.duration.push(duration);
+			transition.timing_function.push(timing_function);
+			transition.delay.push(delay);
+			
+			Ok(())
+		})?;
+		Ok(transition)
+    }
+}
+
+// 解析timing_function的函数式写法
+fn parse_timing_function<'a, 'i, 't>(input: &mut Parser<'i, 't>, name: CowRcStr<'static>) -> Result<AnimationTimingFunction, TokenParseError<'i>> {
+	Ok(match name.as_ref() {
+		"cubic-bezier" => input.parse_nested_block(|input| {
+			Ok(AnimationTimingFunction::CubicBezier(
+				input.expect_number()?,
+				{
+					input.expect_comma()?;
+					input.expect_number()?
+				},
+				{
+					input.expect_comma()?;
+					input.expect_number()?
+				},
+				{
+					input.expect_comma()?;
+					input.expect_number()?
+				},
+			))
+		})?,
+		"linear" => AnimationTimingFunction::Linear,
+		"steps" => input.parse_nested_block::<_, _, TokenErrorsInfo<'i>>(|input| {
+			let location = input.current_source_location();
+			Ok(AnimationTimingFunction::Step(input.expect_number()? as usize, {
+				if let Ok(_r) = input.expect_comma() {
+					let p = input.expect_ident()?;
+					match p.as_ref() {
+						"jump-start" | "start" => EStepMode::JumpStart,
+						"jump-end" | "end" => EStepMode::JumpEnd,
+						"jump-none" => EStepMode::JumpNone,
+						"jump-both" => EStepMode::JumpEnd,
+						_ => return Err(TokenParseError::from_expect(location, "jump-start | start | jump-end | end | jump-none | jump-both", Token::Ident(p.clone())))?,
+					}
+				} else {
+					EStepMode::JumpStart
+				}
+			}))
+		})?,
+		_ => AnimationTimingFunction::Linear,
+	})
+}
+
+pub fn parse_transation_property<'a, 'i, 't>(input: &mut Parser<'i, 't>) -> Result<usize, TokenParseError<'i>> {
+	let location = input.current_source_location();
+	let token = input.expect_ident()?;
+
+	match parse_transation_property1(token) {
+		Ok(r) => return Ok(r),
+		Err(_) => return Err(TokenParseError::from_expect(location, "<transation_property>", Token::Ident(token.clone()))),
+	};
+}
+
+pub fn parse_transation_property1<'a, 'i, 't>(name: &CowRcStr<'a>) -> Result<usize, ()> {
+	let r = match name.as_ref() {
+		"all" => std::usize::MAX,
+		"background-repeat" => StyleType::BackgroundRepeat as usize,
+		"color" => StyleType::Color as usize,
+		"background-image-clip" => StyleType::BackgroundImageClip as usize,
+		// 兼容老的gui的错误写法
+		"background-color" => StyleType::BackgroundColor as usize,
+		"border-color" => StyleType::BorderColor as usize,
+		"hsi" => StyleType::Hsi as usize,
+		"blur" => StyleType::Blur as usize,
+		"transform" => StyleType::Transform as usize,
+		"border-radius" => StyleType::BorderRadius as usize,
+		"width" => StyleType::Width as usize,
+		"height" => StyleType::Height as usize,
+		"margin" => StyleType::MarginTop as usize | StyleType::MarginRight as usize | StyleType::MarginBottom as usize | StyleType::MarginLeft as usize,
+		"margin-top" => StyleType::MarginTop as usize,
+		"margin-right" => StyleType::MarginRight as usize,
+		"margin-bottom" => StyleType::MarginBottom as usize,
+		"margin-left" => StyleType::MarginLeft as usize,
+		"padding" => StyleType::PaddingTop as usize | StyleType::PaddingRight as usize | StyleType::PaddingBottom as usize | StyleType::PaddingLeft as usize,
+		"padding-top" => StyleType::PaddingTop as usize,
+		"padding-right" => StyleType::PaddingRight as usize,
+		"padding-bottom" => StyleType::PaddingBottom as usize,
+		"padding-left" => StyleType::PaddingLeft as usize,
+		"border-width" => StyleType::BorderTop as usize | StyleType::BorderRight as usize | StyleType::BorderBottom as usize | StyleType::BorderLeft as usize,
+		"border-top" => StyleType::BorderTop as usize,
+		"border-right" => StyleType::BorderRight as usize,
+		"border-bottom" => StyleType::BorderBottom as usize,
+		"border-left" => StyleType::BorderLeft as usize,
+		"top" => StyleType::PositionTop as usize,
+		"right" => StyleType::PositionRight as usize,
+		"bottom" => StyleType::PositionBottom as usize,
+		"left" => StyleType::PositionLeft as usize,
+		"min-width" => StyleType::MinWidth as usize,
+		"min-height" => StyleType::MinHeight as usize,
+		"max-width" => StyleType::MaxWidth as usize,
+		"max-height" => StyleType::MaxHeight as usize,
+		"opacity" => StyleType::Opacity as usize,
+		"tanslate" => StyleType::Translate as usize,
+		"scale" => StyleType::Scale as usize,
+		"rotate" => StyleType::Rotate as usize,
+
+		_ => return Err(()), // 其他属性忽略
+	};
+	Ok(r)
+}
+
 
 pub trait StyleParse: Sized {
     fn parse<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Self, TokenParseError<'i>>;
@@ -2244,24 +2427,39 @@ impl StyleParse for IterationCount {
 }
 
 /// 解析由逗号分割的列表，结果存放在SmallVec中
-pub fn parse_comma_separated<'i, 't, F, T, E>(input: &mut Parser<'i, 't>, mut parse_one: F) -> Result<SmallVec<[T; 1]>, E>
+pub fn parse_comma_separated<'i, 't, F, T>(input: &mut Parser<'i, 't>, mut parse_one: F) -> Result<SmallVec<[T; 1]>, TokenParseError<'i>>
 where
-    F: for<'tt> FnMut(&mut Parser<'i, 'tt>) -> Result<T, E>,
+    F: for<'tt> FnMut(&mut Parser<'i, 'tt>) -> Result<T, TokenParseError<'i>>,
 {
-    // Vec grows from 0 to 4 by default on first push().  So allocate with
-    // capacity 1, so in the somewhat common case of only one item we don't
-    // way overallocate.  Note that we always push at least one item if
-    // parsing succeeds.
-    let mut values = SmallVec::with_capacity(1);
-    loop {
-        input.skip_whitespace(); // Unnecessary for correctness, but may help try() in parse_one rewind less.
-                                 // let r = parse_one(input);
-        values.push(parse_one(input)?);
-        match input.next() {
-            Ok(&Token::Comma) => continue,
-            _ => return Ok(values),
-        }
-    }
+
+	let mut values = SmallVec::with_capacity(1);
+	let mut f = move |input: &mut Parser<'i, '_>| {
+		let location = input.current_source_location();
+		match parse_one(input) {
+			Ok(r) => Ok(r),
+			Err(e) => Err(ParseError {kind: ParseErrorKind::Custom(e), location}),
+		}
+	};
+	loop {
+		input.skip_whitespace(); // Unnecessary for correctness, but may help try() in parse_one rewind less.
+		match input.parse_until_before(Delimiter::Comma | Delimiter::Semicolon, &mut f) {
+			Ok(r) => values.push(r),
+			Err(e) => {
+				match e.kind {
+					ParseErrorKind::Basic(r) => return Err(TokenParseError {
+						location: e.location,
+						error: TokenErrorsInfo::BaseParseError(r)
+					}),
+					ParseErrorKind::Custom(r) => return Err(r),
+				}
+			},
+		};
+		match input.next() {
+			Err(_) | Ok(&Token::Semicolon) => return Ok(values),
+			Ok(&Token::Comma) => continue,
+			Ok(_) => unreachable!(),
+		}
+	}
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -3240,7 +3438,7 @@ fn test_animation() {
     let s = "
 	.c2677724671{
 		animation: myanimation 2s 2s 5 reverse paused backwards cubic-bezier(0.1, 0.7, 1.0, 0.1);
-	}
+	},
 	.c2677724672{
 		animation-timing-function: steps(2, start), steps(2, start), ease, ease-in, ease-out, ease-in-out, linear, step-start, step-end, cubic-bezier(0.1, 0.7, 1.0, 0.1) ;
 		animation-name: myanimation, myanimation1;
@@ -3250,9 +3448,13 @@ fn test_animation() {
 		animation-direction: reverse, alternate, normal, alternate-reverse;
 		animation-fill-mode: backwards, both, none, forwards ;
 		animation-play-state: running, paused ;
-	}";
+	}
+	";
 
-    if let Err(_r) = parse_class_map_from_string(s, 0) {}
+	match parse_class_map_from_string(s, 0) {
+		Ok(r) => println!("animation====={:?}", r),
+		Err(_) => todo!(),
+	}
 }
 
 #[test]
@@ -3370,6 +3572,25 @@ fn test_as_image() {
 		as-image: force;
 	}"#;
 
+    if let Ok(r) = parse_class_map_from_string(s, 0) {
+        println!("ret: {:?}", r);
+    }
+}
+
+#[test]
+fn transition() {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
+    let s = r#"
+	.c1363885129 {
+		transition: left 500ms 5ms, bottom 500ms 5ms;
+	}
+	.c2{
+		transition-property: right,top;
+		transition-duration: 2s, 10ms ;
+		transition-delay: 1s, 5ms;
+		transition-timing-function: ease, ease-in;
+	}"#;
+	
     if let Ok(r) = parse_class_map_from_string(s, 0) {
         println!("ret: {:?}", r);
     }
