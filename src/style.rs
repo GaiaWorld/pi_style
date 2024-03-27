@@ -104,6 +104,40 @@ impl Hash for CgColor {
     }
 }
 
+impl From<&str> for CgColor{
+    fn from(value: &str) -> Self {
+        let rgba = if value.starts_with("rgba"){
+            let rgba_values: Vec<u8> = value
+            .trim_start_matches("rgba(")
+            .trim_end_matches(")")
+            .split(',')
+            .map(|x| x.parse().unwrap())
+            .collect();
+            rgba_values
+        } else if value.starts_with("rgb"){
+            let mut rgba_values: Vec<u8> = value
+            .trim_start_matches("rgb(")
+            .trim_end_matches(")")
+            .split(',')
+            .map(|x| x.parse().unwrap())
+            .collect();
+            rgba_values.push(255);
+            rgba_values
+        } else {
+            let rgba_values = match value {
+                "red" => vec![255,0,0,1],
+                "black" => vec![0,0,0,1],
+                _=> panic!("svg not surpport color {}", value),
+            };
+
+            rgba_values
+        };
+
+        CgColor::new(rgba[0]as f32 / 255.0 , rgba[1]as f32 / 255.0, rgba[2]as f32 / 255.0, rgba[3]as f32 / 255.0)
+        
+    }
+}
+
 impl CgColor {
     pub fn new(x: f32, y: f32, z: f32, w: f32) -> Self { Self(nalgebra::Vector4::new(x, y, z, w)) }
 }
@@ -646,6 +680,32 @@ pub struct Stroke {
     pub width: NotNan<f32>, //	描边宽度
     pub color: CgColor,     //	描边颜色
 }
+
+// 虚线
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StrokeDasharray {
+    pub start_x: f32,
+    pub start_y: f32,
+    pub real: f32,     //	实线部分长度
+    pub empty: f32,    //	空白处长度
+}
+impl Default for StrokeDasharray {
+    fn default() -> Self {
+        Self { real: 100000000.0, empty: 0.0, start_x: 0.0, start_y: 0.0 }
+    }
+}
+
+impl From<&str> for StrokeDasharray {
+    fn from(value: &str) -> Self {
+        let args: Vec<f32> = value
+            .split(',')
+            .map(|x| x.parse().unwrap())
+            .collect();
+        Self { real: args[0], empty: args[1], start_x: 0.0, start_y: 0.0 }
+    }
+}
+// 111111111nnnnnnnnn
+// 222222222mmmmmmmmm
 
 // #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 // pub struct Outline {
