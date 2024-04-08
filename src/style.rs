@@ -586,6 +586,7 @@ pub enum Color {
     RGBA(CgColor),
     LinearGradient(LinearGradientColor),
     // RadialGradient(RadialGradientColor),
+    // SvgLinearGradient(u64),
 }
 impl Hash for Color {
     fn hash<H: Hasher>(&self, hasher: &mut H) {
@@ -704,6 +705,21 @@ impl From<&str> for StrokeDasharray {
         Self { real: args[0], empty: args[1], start_x: 0.0, start_y: 0.0 }
     }
 }
+
+// 虚线
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Shadow {
+    pub color: CgColor, // 颜色
+    pub offset_x: f32, // 偏移
+    pub offset_y: f32,    
+    pub blur_level: f32,  //模糊等级
+}
+impl Default for Shadow {
+    fn default() -> Self {
+        Self { color: CgColor::new(0.0,0.0,0.0,0.0), offset_x: 0.0, offset_y: 0.0, blur_level: 3.0 }
+    }
+}
+
 // 111111111nnnnnnnnn
 // 222222222mmmmmmmmm
 
