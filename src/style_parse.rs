@@ -1130,7 +1130,7 @@ fn parse_text_stroke<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Stroke, Token
     })
 }
 
-fn parse_text_outer_glow<'i, 't>(input: &mut Parser<'i, 't>) -> Result<OuterGlow, TokenParseError<'i>> {
+fn parse_outer_glow<'i, 't>(input: &mut Parser<'i, 't>) -> Result<OuterGlow, TokenParseError<'i>> {
     // let location = input.current_source_location();
     let mut glow = OuterGlow::default();
     let mut is_parse_color = false; // 是否已经解析了颜色
@@ -1631,7 +1631,7 @@ pub fn parse_style_item_value<'i, 't>(location: SourceLocation, name: CowRcStr<'
         // 文字外发光
         "text-outer-grow" => {
             input.expect_colon()?;
-            let ty = TextOuterGlowType(parse_text_outer_glow(input)?);
+            let ty = TextOuterGlowType(parse_outer_glow(input)?);
             log::trace!("{:?}", ty);
             buffer.push_back(Attribute::TextOuterGlow(ty));
         }
