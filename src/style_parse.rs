@@ -1130,7 +1130,7 @@ fn parse_text_stroke<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Stroke, Token
     })
 }
 
-fn parse_outer_glow<'i, 't>(input: &mut Parser<'i, 't>) -> Result<OuterGlow, TokenParseError<'i>> {
+pub fn parse_outer_glow<'i, 't>(input: &mut Parser<'i, 't>) -> Result<OuterGlow, TokenParseError<'i>> {
     // let location = input.current_source_location();
     let mut glow = OuterGlow::default();
     let mut is_parse_color = false; // 是否已经解析了颜色
