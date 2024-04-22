@@ -18,7 +18,7 @@ use crate::style::{
     Aabb2, AnimationDirection, AnimationFillMode, AnimationPlayState, AnimationTimingFunction, BlendMode, BorderImageSlice, BorderRadius, BoxShadow,
     CgColor, Color, Enable, FitType, FontSize, FontStyle, Hsi, ImageRepeat, IterationCount, LengthUnit, LineHeight, MaskImage, NotNanRect, Point2,
     Stroke, StyleType, TextAlign, TextContent, TextShadow, Time, TransformFunc, TransformFuncs, TransformOrigin, VerticalAlign, WhiteSpace, AnimationName, BaseShape, Center, AsImage,
-	TextOverflow,
+	TextOverflow, OuterGlow,
 };
 use pi_curves::curve::frame::{FrameValueScale, FrameDataValue, KeyFrameCurveValue};
 use std::ops::Add;
@@ -69,7 +69,7 @@ impl ClassSheet {
 pub struct ClassMeta {
     pub start: usize,                         // 在某个buffer中的开始偏移
     pub end: usize,                           // 在某个buffer中的结束偏移
-    pub class_style_mark: BitArray<[u32; 3]>, // 标记class中的有效属性
+    pub class_style_mark: BitArray<[u32; 4]>, // 标记class中的有效属性
 }
 
 macro_rules! get_type {
@@ -165,7 +165,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 96
+                    Self::get_type() as u8 + 128
                 }
                 fn size() -> usize {
                     0
@@ -191,7 +191,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 96
+                    Self::get_type() as u8 + 128
                 }
                 fn size() -> usize {
                     0
@@ -217,7 +217,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 96
+                    Self::get_type() as u8 + 128
                 }
                 fn size() -> usize {
                     0
@@ -243,7 +243,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 96
+                    Self::get_type() as u8 + 128
                 }
                 fn size() -> usize {
                     0
@@ -269,7 +269,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 96
+                    Self::get_type() as u8 + 128
                 }
                 fn size() -> usize {
                     0
@@ -296,7 +296,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 96
+                    Self::get_type() as u8 + 128
                 }
                 fn size() -> usize {
                     0
@@ -323,7 +323,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 96
+                    Self::get_type() as u8 + 98
                 }
                 fn size() -> usize {
                     0
@@ -349,7 +349,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 96
+                    Self::get_type() as u8 + 98
                 }
                 fn size() -> usize {
                     0
@@ -381,6 +381,7 @@ impl_style!(VerticalAlignType, text_style, vertical_align, VerticalAlign, Vertic
 impl_style!(ColorType, text_style, color, Color, Color);
 impl_style!(TextStrokeType, text_style, text_stroke, TextStroke, Stroke);
 impl_style!(TextShadowType, text_style, text_shadow, TextShadow, SmallVec<[TextShadow; 1]>);
+impl_style!(TextOuterGlowType, text_style, text_outer_glow, TextOuterGlow, OuterGlow);
 
 impl_style!(BackgroundImageType, background_image, BackgroundImage, Atom);
 impl_style!(BackgroundImageClipType, background_image_clip, BackgroundImageClip, NotNanRect);
@@ -608,6 +609,7 @@ impl_interpolation!(@keep, VerticalAlignType);
 impl_interpolation!(@animatable_value, ColorType);
 impl_interpolation!(@animatable_value, TextStrokeType);
 impl_interpolation!(@keep, TextShadowType);
+impl_interpolation!(@keep, TextOuterGlowType);
 
 impl_interpolation!(@keep, BackgroundImageType);
 impl_interpolation!(@keep, BackgroundImageClipType);

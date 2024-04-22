@@ -18,9 +18,7 @@ use smallvec::SmallVec;
 use thiserror::Error;
 
 use crate::style::{
-    Animation, AnimationDirection, AnimationFillMode, AnimationPlayState, AnimationTimingFunction, BlendMode, BorderImageSlice, BorderRadius,
-    BoxShadow, CgColor, Color, ColorAndPosition, Enable, FitType, FontSize, Hsi, ImageRepeat, ImageRepeatOption, IterationCount, LengthUnit,
-    LineHeight, LinearGradientColor, MaskImage, NotNanRect, Stroke, TextAlign, TextShadow, Time, TransformFunc, TransformOrigin, WhiteSpace, AnimationName, BaseShape, Center, TextContent, AsImage, TextOverflow, Transition,
+    Animation, AnimationDirection, AnimationFillMode, AnimationName, AnimationPlayState, AnimationTimingFunction, AsImage, BaseShape, BlendMode, BorderImageSlice, BorderRadius, BoxShadow, Center, CgColor, Color, ColorAndPosition, Enable, FitType, FontSize, Hsi, ImageRepeat, ImageRepeatOption, IterationCount, LengthUnit, LineHeight, LinearGradientColor, MaskImage, NotNanRect, OuterGlow, Stroke, TextAlign, TextContent, TextOverflow, TextShadow, Time, TransformFunc, TransformOrigin, Transition, WhiteSpace
 };
 use crate::style::StyleType;
 
@@ -142,6 +140,8 @@ pub enum Attribute {
     TransitionDuration(TransitionDurationType),             // 93
     TransitionTimingFunction(TransitionTimingFunctionType), // 94
     TransitionDelay(TransitionDelayType),                   // 95
+
+    TextOuterGlow(TextOuterGlowType),       // 96
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
@@ -591,6 +591,10 @@ pub fn style_to_buffer(style_buffer: &mut Vec<u8>, mut style: Attribute,  class_
 			class_meta.class_style_mark.set(TransitionDelayType::get_type() as usize, true);
 			r.write(style_buffer);
 		},
+        Attribute::TextOuterGlow(r) => unsafe {
+            class_meta.class_style_mark.set(TextOuterGlowType::get_type() as usize, true);
+			r.write(style_buffer);
+        },
 	}
 	std::mem::forget(style);
 }
@@ -1126,6 +1130,40 @@ fn parse_text_stroke<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Stroke, Token
     })
 }
 
+fn parse_text_outer_glow<'i, 't>(input: &mut Parser<'i, 't>) -> Result<OuterGlow, TokenParseError<'i>> {
+    // let location = input.current_source_location();
+    let mut glow = OuterGlow::default();
+    let mut is_parse_color = false; // 是否已经解析了颜色
+    let mut parse_len_count: u32 = 0; // 解析的长度的数量
+    
+    loop {
+        let mut is_parse = false;
+        if !is_parse_color {
+            if let Ok(r) = input.try_parse(parse_color) {
+                glow.color = r;
+                is_parse_color = true;
+                is_parse = true;
+            };
+        }
+
+        if parse_len_count <= 2 {
+            if let Ok(r) = input.try_parse(parse_len) {
+                if parse_len_count == 0 {
+                    glow.distance = r;
+                }
+                parse_len_count += 1;
+                is_parse = true;
+            };
+        }
+
+        // 本次没有解析到任何属性， 或者已经完成解析， 则跳出循环
+        if !is_parse || (parse_len_count == 2 && is_parse_color) {
+            break;
+        }
+    }
+    Ok(glow)
+}
+
 fn parse_transform_origin<'i, 't>(input: &mut Parser<'i, 't>) -> Result<TransformOrigin, TokenParseError<'i>> {
     let x = parse_transform_origin1(input)?;
     Ok(TransformOrigin::XY(
@@ -1589,6 +1627,13 @@ pub fn parse_style_item_value<'i, 't>(location: SourceLocation, name: CowRcStr<'
             let ty = TextStrokeType(parse_text_stroke(input)?);
             log::trace!("{:?}", ty);
             buffer.push_back(Attribute::TextStroke(ty));
+        }
+        // 文字外发光
+        "text-outer-grow" => {
+            input.expect_colon()?;
+            let ty = TextOuterGlowType(parse_text_outer_glow(input)?);
+            log::trace!("{:?}", ty);
+            buffer.push_back(Attribute::TextOuterGlow(ty));
         }
 
         // "font-style" => show_attr.push(Attribute::FontStyle( Color::RGBA(parse_color_string(value)?) )),

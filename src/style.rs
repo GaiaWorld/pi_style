@@ -509,6 +509,8 @@ pub struct TextStyle {
 
 	pub color: Color, //颜色
     pub text_shadow: TextShadows, // 缩进， 单位： 像素
+
+    pub text_outer_glow: OuterGlow, // 文字外发光
 }
 
 impl Default for TextStyle {
@@ -529,6 +531,8 @@ impl Default for TextStyle {
             font_size: Default::default(),
             font_family: Default::default(),
 			text_overflow: Default::default(),
+
+            text_outer_glow: Default::default(),
         }
     }
 }
@@ -541,6 +545,17 @@ pub struct TextShadow {
     pub v: f32,         //	必需。垂直阴影的位置。允许负值。	测试
     pub blur: f32,      //	可选。模糊的距离。	测试
     pub color: CgColor, //	可选。阴影的颜色。参阅 CSS 颜色值。
+}
+
+/// 外发光
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct OuterGlow {
+    /// 外发光颜色
+    pub color: CgColor,
+    /// 外发光距离
+    pub distance: f32,
+    /// 外法光强度
+    pub intensity: f32,
 }
 
 #[derive(Debug, Clone, EnumDefault, Serialize, Deserialize)]
@@ -1106,6 +1121,8 @@ pub enum StyleType {
 	TransitionDuration= 93,
 	TransitionTimingFunction = 94,
 	TransitionDelay = 95,
+
+    TextOuterGlow = 96,
 }
 
 // // 可插值属性

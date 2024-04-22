@@ -1,6 +1,6 @@
 [package]
 name = "pi_style"
-version = "0.1.8"
+version = "0.1.9"
 authors = ["suncy <@gmail.com>"]
 edition = "2021"
 description = "css struct define and parse"
