@@ -26,7 +26,7 @@ pub use pi_flex_layout::style::OverflowWrap;
 
 pub trait Attr: 'static + Sync + Send {
     /// 获取样式属性类型
-    fn get_type() -> StyleType
+    fn get_type() -> u8
     where
         Self: Sized;
     /// 获取样式属性索引（对应StyleAttrs的索引）
@@ -75,7 +75,7 @@ pub struct ClassMeta {
 macro_rules! get_type {
     ($key: expr) => {
         #[inline]
-        fn get_type() -> StyleType { $key }
+        fn get_type() -> u8 { $key as u8 }
     };
 }
 
@@ -148,34 +148,10 @@ macro_rules! impl_style {
             write_buffer!();
         }
     };
-    ($struct_name: ident, $name: ident, $ty: ident) => {
-        #[derive(Debug, Serialize, Deserialize, Clone, Deref, DerefMut)]
-        pub struct $struct_name(pub $ty);
-
-        impl Attr for $struct_name {
-            fn get_style_index() -> u8 { Self::get_type() as u8 }
-            get_type!(StyleType::$ty);
-            size!($ty);
-            write_buffer!();
-        }
-
-        $crate::paste::item! {
-            #[derive(Debug, Clone)]
-            pub struct[<Reset $struct_name>];
-
-            impl Attr for [<Reset $struct_name>] {
-                fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 128
-                }
-                fn size() -> usize {
-                    0
-                }
-                get_type!(StyleType::$ty);
-                write_reset!();
-            }
-        }
+    ($struct_name: ident, $ty: ident) => {
+        impl_style!($struct_name, $ty, $ty);
     };
-    ($struct_name: ident, $name: ident, $ty: ident, $value_ty: ident) => {
+    ($struct_name: ident, $ty: ident, $value_ty: ty) => {
         #[derive(Debug, Serialize, Deserialize, Clone, Deref, DerefMut)]
         pub struct $struct_name(pub $value_ty);
         impl Attr for $struct_name {
@@ -192,164 +168,6 @@ macro_rules! impl_style {
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
                     Self::get_type() as u8 + 128
-                }
-                fn size() -> usize {
-                    0
-                }
-                get_type!(StyleType::$ty);
-                write_reset!();
-            }
-        }
-    };
-    ($struct_name: ident, $name: ident, $feild: ident, $ty: ident, $value_ty: ty) => {
-        #[derive(Debug, Serialize, Deserialize, Clone, Deref, DerefMut)]
-        pub struct $struct_name(pub $value_ty);
-        impl Attr for $struct_name {
-            fn get_style_index() -> u8 { Self::get_type() as u8 }
-            get_type!(StyleType::$ty);
-            size!($value_ty);
-            write_buffer!();
-        }
-
-        $crate::paste::item! {
-            #[derive(Debug, Clone)]
-            pub struct[<Reset $struct_name>];
-
-            impl Attr for [<Reset $struct_name>] {
-                fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 128
-                }
-                fn size() -> usize {
-                    0
-                }
-                get_type!(StyleType::$ty);
-                write_reset!();
-            }
-        }
-    };
-    ($struct_name: ident, $name: ident, $feild1: ident, $feild2: ident, $ty: ident, $value_ty: ident) => {
-        #[derive(Debug, Serialize, Deserialize, Clone, Deref, DerefMut)]
-        pub struct $struct_name(pub $value_ty);
-        impl Attr for $struct_name {
-            fn get_style_index() -> u8 { Self::get_type() as u8 }
-            get_type!(StyleType::$ty);
-            size!($value_ty);
-            write_buffer!();
-        }
-
-        $crate::paste::item! {
-            #[derive(Debug, Clone)]
-            pub struct[<Reset $struct_name>];
-
-            impl Attr for [<Reset $struct_name>] {
-                fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 128
-                }
-                fn size() -> usize {
-                    0
-                }
-                get_type!(StyleType::$ty);
-                write_reset!();
-            }
-        }
-    };
-    (@func $struct_name: ident,  $name: ident, $set_func: ident, $get_func: ident, $ty: ident, $value_ty: ident) => {
-        #[derive(Debug, Serialize, Deserialize, Clone, Deref, DerefMut)]
-        pub struct $struct_name(pub $value_ty);
-        impl Attr for $struct_name {
-            fn get_style_index() -> u8 { Self::get_type() as u8 }
-            get_type!(StyleType::$ty);
-            size!($value_ty);
-            write_buffer!();
-        }
-
-        $crate::paste::item! {
-            #[derive(Debug, Clone)]
-            pub struct[<Reset $struct_name>];
-
-            impl Attr for [<Reset $struct_name>] {
-                fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 128
-                }
-                fn size() -> usize {
-                    0
-                }
-                get_type!(StyleType::$ty);
-                write_reset!();
-            }
-        }
-    };
-    // 方法设置，并且不实现set_default和reset
-    (@func $struct_name: ident,  $name: ident, $set_func: ident, $ty: ident, $value_ty: ident) => {
-        #[derive(Debug, Serialize, Deserialize, Clone, Deref, DerefMut)]
-        pub struct $struct_name(pub $value_ty);
-        impl Attr for $struct_name {
-            fn get_style_index() -> u8 { Self::get_type() as u8 }
-            get_type!(StyleType::$ty);
-            size!($value_ty);
-            write_buffer!();
-        }
-
-        $crate::paste::item! {
-            #[derive(Debug, Clone)]
-            pub struct[<Reset $struct_name>];
-
-            impl Attr for [<Reset $struct_name>] {
-                fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 128
-                }
-                fn size() -> usize {
-                    0
-                }
-                get_type!(StyleType::$ty);
-                write_reset!();
-            }
-        }
-    };
-
-    (@box_model_single $struct_name: ident, $name: ident, $feild: ident, $ty: ident, $value_ty: ident) => {
-        #[derive(Debug, Serialize, Deserialize, Clone, Deref, DerefMut)]
-        pub struct $struct_name(pub $value_ty);
-        impl Attr for $struct_name {
-            fn get_style_index() -> u8 { Self::get_type() as u8 }
-            get_type!(StyleType::$ty);
-            size!($value_ty);
-            write_buffer!();
-        }
-
-        $crate::paste::item! {
-            #[derive(Debug, Clone)]
-            pub struct[<Reset $struct_name>];
-
-            impl Attr for [<Reset $struct_name>] {
-                fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 98
-                }
-                fn size() -> usize {
-                    0
-                }
-                get_type!(StyleType::$ty);
-                write_reset!();
-            }
-        }
-    };
-    (@box_model $struct_name: ident, $name: ident, $ty: ident) => {
-        #[derive(Debug, Serialize, Deserialize, Clone, Deref, DerefMut)]
-        pub struct $struct_name(pub $ty);
-        impl Attr for $struct_name {
-            fn get_style_index() -> u8 { Self::get_type() as u8 }
-            get_type!(StyleType::$ty);
-            size!($ty);
-            write_buffer!();
-        }
-
-        $crate::paste::item! {
-            #[derive(Debug, Clone)]
-            pub struct[<Reset $struct_name>];
-
-            impl Attr for [<Reset $struct_name>] {
-                fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 98
                 }
                 fn size() -> usize {
                     0
@@ -363,167 +181,155 @@ macro_rules! impl_style {
 
 
 impl_style!(EmptyType);
-impl_style!(FontStyleType, text_style, font_style, FontStyle, FontStyle);
+impl_style!(FontStyleType, FontStyle);
 
-impl_style!(FontWeightType, text_style, font_weight, FontWeight, usize);
-impl_style!(FontSizeType, text_style, font_size, FontSize, FontSize);
-impl_style!(FontFamilyType, text_style, font_family, FontFamily, Atom);
-impl_style!(LetterSpacingType, text_style, letter_spacing, LetterSpacing, f32);
-impl_style!(WordSpacingType, text_style, word_spacing, WordSpacing, f32);
-impl_style!(LineHeightType, text_style, line_height, LineHeight, LineHeight);
-impl_style!(TextIndentType, text_style, text_indent, TextIndent, f32);
-impl_style!(WhiteSpaceType, text_style, white_space, WhiteSpace, WhiteSpace);
-impl_style!(TextOverflowType, text_style, text_overflow, TextOverflow, TextOverflow);
+impl_style!(FontWeightType, FontWeight, usize);
+impl_style!(FontSizeType, FontSize, FontSize);
+impl_style!(FontFamilyType,FontFamily, Atom);
+impl_style!(LetterSpacingType, LetterSpacing, f32);
+impl_style!(WordSpacingType, WordSpacing, f32);
+impl_style!(LineHeightType, LineHeight, LineHeight);
+impl_style!(TextIndentType, TextIndent, f32);
+impl_style!(WhiteSpaceType, WhiteSpace, WhiteSpace);
+impl_style!(TextOverflowType, TextOverflow, TextOverflow);
 
-impl_style!(TextContentType, text_content, TextContent);
-impl_style!(TextAlignType, text_style, text_align, TextAlign, TextAlign);
-impl_style!(VerticalAlignType, text_style, vertical_align, VerticalAlign, VerticalAlign);
-impl_style!(ColorType, text_style, color, Color, Color);
-impl_style!(TextStrokeType, text_style, text_stroke, TextStroke, Stroke);
-impl_style!(TextShadowType, text_style, text_shadow, TextShadow, SmallVec<[TextShadow; 1]>);
-impl_style!(TextOuterGlowType, text_style, text_outer_glow, TextOuterGlow, OuterGlow);
+impl_style!(TextContentType, TextContent);
+impl_style!(TextAlignType, TextAlign, TextAlign);
+impl_style!(VerticalAlignType, VerticalAlign, VerticalAlign);
+impl_style!(ColorType, Color, Color);
+impl_style!(TextStrokeType, TextStroke, Stroke);
+impl_style!(TextShadowType, TextShadow, SmallVec<[TextShadow; 1]>);
+impl_style!(TextOuterGlowType, TextOuterGlow, OuterGlow);
 
-impl_style!(BackgroundImageType, background_image, BackgroundImage, Atom);
-impl_style!(BackgroundImageClipType, background_image_clip, BackgroundImageClip, NotNanRect);
-impl_style!(ObjectFitType, background_image_mod, object_fit, ObjectFit, FitType);
-impl_style!(BackgroundRepeatType, background_image_mod, repeat, BackgroundRepeat, ImageRepeat);
+impl_style!(BackgroundImageType, BackgroundImage, Atom);
+impl_style!(BackgroundImageClipType, BackgroundImageClip, NotNanRect);
+impl_style!(ObjectFitType, ObjectFit, FitType);
+impl_style!(BackgroundRepeatType, BackgroundRepeat, ImageRepeat);
 
-impl_style!(BorderImageType, border_image, BorderImage, Atom);
-impl_style!(BorderImageClipType, border_image_clip, BorderImageClip, NotNanRect);
-impl_style!(BorderImageSliceType, border_image_slice, BorderImageSlice);
-impl_style!(BorderImageRepeatType, border_image_repeat, BorderImageRepeat, ImageRepeat);
+impl_style!(BorderImageType, BorderImage, Atom);
+impl_style!(BorderImageClipType, BorderImageClip, NotNanRect);
+impl_style!(BorderImageSliceType, BorderImageSlice);
+impl_style!(BorderImageRepeatType, BorderImageRepeat, ImageRepeat);
 
-impl_style!(BorderColorType, border_color, BorderColor, CgColor);
+impl_style!(BorderColorType, BorderColor, CgColor);
 
-impl_style!(BackgroundColorType, background_color, BackgroundColor, Color);
+impl_style!(BackgroundColorType, BackgroundColor, Color);
 
-impl_style!(BoxShadowType, box_shadow, BoxShadow);
-impl_style!(ClipPathType, clip_path, ClipPath, BaseShape);
+impl_style!(BoxShadowType, BoxShadow);
+impl_style!(ClipPathType, ClipPath, BaseShape);
 
-impl_style!(OpacityType, opacity, Opacity, f32);
-impl_style!(BorderRadiusType, border_radius, BorderRadius);
-impl_style!(HsiType, hsi, Hsi);
-impl_style!(BlurType, blur, Blur, f32);
-impl_style!(TransformOriginType, transform, origin, TransformOrigin, TransformOrigin);
-impl_style!(TransformType, transform, funcs, Transform, TransformFuncs);
-impl_style!(TranslateType, transform, translate, Translate, TowLengthUnit);
-impl_style!(ScaleType, transform, scale, Scale, TowF32);
-impl_style!(RotateType, transform, rotate, Rotate, f32);
+impl_style!(OpacityType, Opacity, f32);
+impl_style!(BorderRadiusType, BorderRadius);
+impl_style!(HsiType, Hsi);
+impl_style!(BlurType, Blur, f32);
+impl_style!(TransformOriginType, TransformOrigin, TransformOrigin);
+impl_style!(TransformType, Transform, TransformFuncs);
+impl_style!(TranslateType, Translate, TowLengthUnit);
+impl_style!(ScaleType, Scale, TowF32);
+impl_style!(RotateType, Rotate, f32);
 type TowLengthUnit = [LengthUnit;2];
 type TowF32 = [f32;2];
 
-impl_style!(DirectionType, flex_container, direction, Direction, Direction);
-impl_style!(AspectRatioType, flex_normal, aspect_ratio, AspectRatio, Number);
-impl_style!(OrderType, flex_normal, order, Order, isize);
-impl_style!(FlexBasisType, flex_normal, flex_basis, FlexBasis, Dimension);
+impl_style!(DirectionType, Direction, Direction);
+impl_style!(AspectRatioType, AspectRatio, Number);
+impl_style!(OrderType, Order, isize);
+impl_style!(FlexBasisType, FlexBasis, Dimension);
 
 
-impl_style!(@func DisplayType, show, set_display, get_display, Display, Display);
-impl_style!(@func VisibilityType, show, set_visibility, get_visibility, Visibility, bool);
-impl_style!(@func EnableType, show, set_enable, get_enable, Enable, Enable);
+impl_style!(DisplayType, Display, Display);
+impl_style!(VisibilityType, Visibility, bool);
+impl_style!(EnableType, Enable, Enable);
 
-impl_style!(@func VNodeType, node_state, set_vnode, NodeState, bool);
+impl_style!(VNodeType, NodeState, bool);
 
-impl_style!(TransformWillChangeType, transform_will_change, TransformWillChange, bool);
+impl_style!(TransformWillChangeType, TransformWillChange, bool);
 
-impl_style!(ZIndexType, z_index, ZIndex, isize);
-impl_style!(OverflowType, overflow, Overflow, bool);
+impl_style!(ZIndexType, ZIndex, isize);
+impl_style!(OverflowType, Overflow, bool);
 
-impl_style!(MaskImageType, mask_image, MaskImage);
-impl_style!(MaskImageClipType, mask_image_clip, MaskImageClip, NotNanRect);
+impl_style!(MaskImageType, MaskImage);
+impl_style!(MaskImageClipType, MaskImageClip, NotNanRect);
 
-impl_style!(WidthType, size, width, Width, Dimension);
-impl_style!(HeightType, size, height, Height, Dimension);
+impl_style!(WidthType, Width, Dimension);
+impl_style!(HeightType, Height, Dimension);
 
 
-impl_style!(@box_model_single MarginTopType, margin, top, MarginTop, Dimension);
-impl_style!(@box_model_single MarginRightType, margin, right, MarginRight, Dimension);
-impl_style!(@box_model_single MarginBottomType, margin, bottom, MarginBottom, Dimension);
-impl_style!(@box_model_single MarginLeftType, margin, left, MarginLeft, Dimension);
+impl_style!(MarginTopType, MarginTop, Dimension);
+impl_style!(MarginRightType, MarginRight, Dimension);
+impl_style!(MarginBottomType, MarginBottom, Dimension);
+impl_style!(MarginLeftType, MarginLeft, Dimension);
 
-impl_style!(@box_model_single PaddingTopType, padding, top, PaddingTop, Dimension);
-impl_style!(@box_model_single PaddingRightType, padding, right, PaddingRight, Dimension);
-impl_style!(@box_model_single PaddingBottomType, padding, bottom, PaddingBottom, Dimension);
-impl_style!(@box_model_single PaddingLeftType, padding, left, PaddingLeft, Dimension);
+impl_style!(PaddingTopType, PaddingTop, Dimension);
+impl_style!(PaddingRightType, PaddingRight, Dimension);
+impl_style!(PaddingBottomType, PaddingBottom, Dimension);
+impl_style!(PaddingLeftType, PaddingLeft, Dimension);
 
-impl_style!(@box_model_single BorderTopType, border, top, BorderTop, Dimension);
-impl_style!(@box_model_single BorderRightType, border, right, BorderRight, Dimension);
-impl_style!(@box_model_single BorderBottomType, border, bottom, BorderBottom, Dimension);
-impl_style!(@box_model_single BorderLeftType, border, left, BorderLeft, Dimension);
+impl_style!(BorderTopType, BorderTop, Dimension);
+impl_style!(BorderRightType, BorderRight, Dimension);
+impl_style!(BorderBottomType, BorderBottom, Dimension);
+impl_style!(BorderLeftType, BorderLeft, Dimension);
 
-impl_style!(@box_model_single PositionTopType, position, top, PositionTop, Dimension);
-impl_style!(@box_model_single PositionRightType, position, right, PositionRight, Dimension);
-impl_style!(@box_model_single PositionBottomType, position, bottom, PositionBottom, Dimension);
-impl_style!(@box_model_single PositionLeftType, position, left, PositionLeft, Dimension);
+impl_style!(PositionTopType, PositionTop, Dimension);
+impl_style!(PositionRightType, PositionRight, Dimension);
+impl_style!(PositionBottomType, PositionBottom, Dimension);
+impl_style!(PositionLeftType, PositionLeft, Dimension);
 
-impl_style!(MinWidthType, min_max, min, width, MinWidth, Dimension);
-impl_style!(MinHeightType, min_max, min, height, MinHeight, Dimension);
-impl_style!(MaxHeightType, min_max, max, height, MaxHeight, Dimension);
-impl_style!(MaxWidthType, min_max, max, width, MaxWidth, Dimension);
-impl_style!(JustifyContentType, flex_container, justify_content, JustifyContent, JustifyContent);
-impl_style!(FlexDirectionType, flex_container, flex_direction, FlexDirection, FlexDirection);
-impl_style!(AlignContentType, flex_container, align_content, AlignContent, AlignContent);
-impl_style!(AlignItemsType, flex_container, align_items, AlignItems, AlignItems);
-impl_style!(FlexWrapType, flex_container, flex_wrap, FlexWrap, FlexWrap);
-impl_style!(OverflowWrapType, flex_container, overflow_wrap, OverflowWrap, OverflowWrap);
+impl_style!(MinWidthType, MinWidth, Dimension);
+impl_style!(MinHeightType, MinHeight, Dimension);
+impl_style!(MaxHeightType, MaxHeight, Dimension);
+impl_style!(MaxWidthType, MaxWidth, Dimension);
+impl_style!(JustifyContentType, JustifyContent, JustifyContent);
+impl_style!(FlexDirectionType, FlexDirection, FlexDirection);
+impl_style!(AlignContentType, AlignContent, AlignContent);
+impl_style!(AlignItemsType, AlignItems, AlignItems);
+impl_style!(FlexWrapType, FlexWrap, FlexWrap);
+impl_style!(OverflowWrapType, OverflowWrap, OverflowWrap);
 
-impl_style!(FlexShrinkType, flex_normal, flex_shrink, FlexShrink, f32);
-impl_style!(FlexGrowType, flex_normal, flex_grow, FlexGrow, f32);
-impl_style!(PositionTypeType, flex_normal, position_type, PositionType, PositionType1);
-impl_style!(AlignSelfType, flex_normal, align_self, AlignSelf, AlignSelf);
+impl_style!(FlexShrinkType, FlexShrink, f32);
+impl_style!(FlexGrowType, FlexGrow, f32);
+impl_style!(PositionTypeType, PositionType, PositionType1);
+impl_style!(AlignSelfType, AlignSelf, AlignSelf);
 
-impl_style!(BlendModeType, blend_mode, BlendMode);
-impl_style!(AnimationNameType, animation, name, AnimationName, AnimationName);
-impl_style!(AnimationDurationType, animation, duration, AnimationDuration, SmallVec<[Time; 1]>);
+impl_style!(BlendModeType, BlendMode);
+impl_style!(AnimationNameType, AnimationName, AnimationName);
+impl_style!(AnimationDurationType, AnimationDuration, SmallVec<[Time; 1]>);
 impl_style!(
     AnimationTimingFunctionType,
-    animation,
-    timing_function,
     AnimationTimingFunction,
     SmallVec<[AnimationTimingFunction; 1]>
 );
-impl_style!(AnimationDelayType, animation, delay, AnimationDelay, SmallVec<[Time; 1]>);
+impl_style!(AnimationDelayType, AnimationDelay, SmallVec<[Time; 1]>);
 impl_style!(
     AnimationIterationCountType,
-    animation,
-    iteration_count,
     AnimationIterationCount,
     SmallVec<[IterationCount; 1]>
 );
 impl_style!(
     AnimationDirectionType,
-    animation,
-    direction,
     AnimationDirection,
     SmallVec<[AnimationDirection; 1]>
 );
 impl_style!(
     AnimationFillModeType,
-    animation,
-    fill_mode,
     AnimationFillMode,
     SmallVec<[AnimationFillMode; 1]>
 );
 impl_style!(
     AnimationPlayStateType,
-    animation,
-    play_state,
     AnimationPlayState,
     SmallVec<[AnimationPlayState; 1]>
 );
 
-impl_style!(TransitionPropertyType, transition, property, TransitionProperty, SmallVec<[usize; 1]>);
-impl_style!(TransitionDurationType, transition, duration, TransitionDuration, SmallVec<[Time; 1]>);
+impl_style!(TransitionPropertyType, TransitionProperty, SmallVec<[usize; 1]>);
+impl_style!(TransitionDurationType, TransitionDuration, SmallVec<[Time; 1]>);
 impl_style!(
     TransitionTimingFunctionType,
-    transition,
-    timing_function,
     TransitionTimingFunction,
     SmallVec<[AnimationTimingFunction; 1]>
 );
-impl_style!(TransitionDelayType, transition, delay, TransitionDelay, SmallVec<[Time; 1]>);
+impl_style!(TransitionDelayType, TransitionDelay, SmallVec<[Time; 1]>);
 
-impl_style!(AsImageType, as_image, AsImage, AsImage);
+impl_style!(AsImageType, AsImage, AsImage);
 
 // impl_style!(ZIndexType, z_index, ZIndex, isize);
 
