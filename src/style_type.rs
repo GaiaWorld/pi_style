@@ -21,7 +21,7 @@ use crate::style::{
 	TextOverflow, OuterGlow,
 };
 use pi_curves::curve::frame::{FrameValueScale, FrameDataValue, KeyFrameCurveValue};
-use std::ops::Add;
+use std::{mem::size_of, ops::Add};
 pub use pi_flex_layout::style::OverflowWrap;
 
 pub trait Attr: 'static + Sync + Send {
@@ -60,6 +60,21 @@ impl ClassSheet {
             meta.end += old_len;
             self.class_map.insert(i, meta);
         }
+    }
+
+    pub fn len(&self) -> usize {
+        self.class_map.len()
+    }
+
+    pub fn capacity(&self) -> usize {
+        self.class_map.capacity()
+    }
+
+    pub fn capacity_mem_size(&self) -> usize {
+        self.style_buffer.capacity() + self.class_map.capacity() * size_of::<ClassMeta>()
+    }
+    pub fn use_mem_size(&self) -> usize {
+        self.style_buffer.len() + self.class_map.len() * size_of::<ClassMeta>()
     }
 }
 
