@@ -182,7 +182,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + 128
+                    Self::get_type() as u8 + STYLE_COUNT
                 }
                 fn size() -> usize {
                     0
@@ -194,7 +194,7 @@ macro_rules! impl_style {
     };
 }
 
-
+pub const STYLE_COUNT: u8 = 127;
 impl_style!(EmptyType);
 impl_style!(FontStyleType, FontStyle);
 
