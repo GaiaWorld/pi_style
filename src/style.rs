@@ -4,6 +4,7 @@
 /// 1. as-image（force、advise、none）： 作为图像缓存， force表示强制缓存为图像；advise表示建议缓存为图像，当缓存空间不足时，不缓存；none表示不缓存为图像，该属性默认为none
 /// 
 use std::default::Default;
+use std::marker::ConstParamTy;
 use std::{
     hash::{Hash, Hasher},
     mem::transmute,
@@ -998,7 +999,7 @@ pub enum AsImage {
 }
 
 // 枚举样式的类型
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, ConstParamTy, PartialEq, Eq)]
 pub enum StyleType {
     BackgroundRepeat = 0,
     FontStyle = 1,

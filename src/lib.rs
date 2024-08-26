@@ -1,4 +1,5 @@
 #![feature(if_let_guard)]
+#![feature(adt_const_params)]
 
 #[macro_use]
 extern crate serde;
