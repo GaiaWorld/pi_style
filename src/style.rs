@@ -4,7 +4,6 @@
 /// 1. as-image（force、advise、none）： 作为图像缓存， force表示强制缓存为图像；advise表示建议缓存为图像，当缓存空间不足时，不缓存；none表示不缓存为图像，该属性默认为none
 /// 
 use std::default::Default;
-use std::marker::ConstParamTy;
 use std::{
     hash::{Hash, Hasher},
     mem::transmute,
@@ -105,6 +104,12 @@ impl Hash for CgColor {
     }
 }
 
+impl CgColor{
+    pub fn is_opacity(&self) -> bool {
+        self.0.w == 1.0
+    }
+}
+
 impl From<&str> for CgColor{
     fn from(value: &str) -> Self {
         let rgba = if value.starts_with("rgba"){
@@ -144,7 +149,7 @@ impl CgColor {
 }
 
 impl Default for CgColor {
-    fn default() -> Self { Self(nalgebra::Vector4::new(1.0, 1.0, 1.0, 1.0)) }
+    fn default() -> Self { Self(nalgebra::Vector4::new(0.0, 0.0, 0.0, 0.0)) }
 }
 
 #[derive(Default)]
@@ -457,8 +462,8 @@ pub struct ImageRepeat {
 // 圆角， 目前仅支持x分量
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct BorderRadius {
-    pub x: [LengthUnit; 4],
-	pub y: [LengthUnit; 4],
+    pub x: [LengthUnit; 4], // 从左上角开始， 顺时针经过的每个角的圆角的x半径
+	pub y: [LengthUnit; 4], // 从左上角开始， 顺时针经过的每个角的圆角的y半径
 }
 
 // 参考CSS的box-shadow的语法
@@ -648,6 +653,16 @@ impl Color {
 pub struct LinearGradientColor {
     pub direction: f32,
     pub list: Vec<ColorAndPosition>,
+}
+
+impl LinearGradientColor {
+    pub fn is_opacity(&self) -> bool {
+        let mut is_opacity = true;
+        for i in self.list.iter() {
+            is_opacity = is_opacity & i.rgba.is_opacity();
+        }
+        is_opacity
+    }
 }
 
 impl Hash for LinearGradientColor {
@@ -999,7 +1014,7 @@ pub enum AsImage {
 }
 
 // 枚举样式的类型
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, ConstParamTy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum StyleType {
     BackgroundRepeat = 0,
     FontStyle = 1,
