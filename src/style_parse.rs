@@ -3641,4 +3641,16 @@ fn transition() {
     }
 }
 
+#[test]
+fn text_content() {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
+    let s = r#"
+	.c1363885129 {
+		content: 'aaaaa';
+	}"#;
+	
+    if let Ok(r) = parse_class_map_from_string(s, 0) {
+        println!("ret: {:?}", r);
+    }
+}
 
