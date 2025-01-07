@@ -969,6 +969,7 @@ impl Show {
     pub fn set_display(&mut self, display: Display) {
         match display {
             Display::Flex => self.0 &= !(ShowType::Display as usize),
+            Display::Grid => self.0 &= !(ShowType::Display as usize),
             Display::None => self.0 |= ShowType::Display as usize,
         }
     }
