@@ -289,6 +289,9 @@ impl_style!(PositionRightType, PositionRight, Dimension);
 impl_style!(PositionBottomType, PositionBottom, Dimension);
 impl_style!(PositionLeftType, PositionLeft, Dimension);
 
+impl_style!(RowGapType, RowGap, f32);
+impl_style!(ColumnGapType, ColumnGap, f32);
+impl_style!(AutoReduceType, AutoReduce, bool);
 impl_style!(MinWidthType, MinWidth, Dimension);
 impl_style!(MinHeightType, MinHeight, Dimension);
 impl_style!(MaxHeightType, MaxHeight, Dimension);

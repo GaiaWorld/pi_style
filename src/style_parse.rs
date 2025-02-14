@@ -142,6 +142,10 @@ pub enum Attribute {
     TransitionDelay(TransitionDelayType),                   // 95
 
     TextOuterGlow(TextOuterGlowType),       // 96
+
+    RowGap(RowGapType),     // 97
+    ColumnGap(ColumnGapType),     // 98
+    AutoReduce(AutoReduceType), // 99
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
@@ -595,6 +599,18 @@ pub fn style_to_buffer(style_buffer: &mut Vec<u8>, mut style: Attribute,  class_
             class_meta.class_style_mark.set(TextOuterGlowType::get_type() as usize, true);
 			r.write(style_buffer);
         },
+        Attribute::RowGap(r) => unsafe {
+            class_meta.class_style_mark.set(RowGapType::get_type() as usize, true);
+			r.write(style_buffer);
+        },
+        Attribute::ColumnGap(r) => unsafe {
+            class_meta.class_style_mark.set(ColumnGapType::get_type() as usize, true);
+			r.write(style_buffer);
+        },
+        Attribute::AutoReduce(r) => unsafe {
+            class_meta.class_style_mark.set(AutoReduceType::get_type() as usize, true);
+			r.write(style_buffer);
+        },
 	}
 	std::mem::forget(style);
 }
@@ -914,6 +930,13 @@ fn parse_enable<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Enable, TokenParse
         "none" => Ok(Enable::None),
         "visible" => Ok(Enable::Visible),
         _ => Ok(Enable::Auto),
+    }
+}
+
+fn parse_bool<'i, 't>(input: &mut Parser<'i, 't>) -> Result<bool, TokenParseError<'i>> {
+    match input.expect_ident()?.as_ref() {
+        "true" => Ok(true),
+        _ => Ok(false),
     }
 }
 
@@ -1941,6 +1964,24 @@ pub fn parse_style_item_value<'i, 't>(location: SourceLocation, name: CowRcStr<'
             let ty = FlexWrapType(parse_yg_wrap(input)?);
             log::trace!("{:?}", ty);
             buffer.push_back(Attribute::FlexWrap(ty));
+        }
+        "row-gap" => {
+            input.expect_colon()?;
+            let ty = RowGapType(parse_len(input)?);
+            log::trace!("{:?}", ty);
+            buffer.push_back(Attribute::RowGap(ty));
+        },
+        "column-gap" => {
+            input.expect_colon()?;
+            let ty = ColumnGapType(parse_len(input)?);
+            log::trace!("{:?}", ty);
+            buffer.push_back(Attribute::ColumnGap(ty));
+        },
+        "auto-reduce" => {
+            input.expect_colon()?;
+            let ty = AutoReduceType(parse_bool(input)?);
+            log::trace!("{:?}", ty);
+            buffer.push_back(Attribute::AutoReduce(ty));
         }
         "flex-direction" => {
             input.expect_colon()?;

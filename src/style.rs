@@ -294,6 +294,9 @@ pub struct FlexContainer {
     pub align_content: AlignContent,
     pub direction: Direction,
 	pub overflow_wrap: OverflowWrap,
+    pub row_gap: f32,
+    pub column_gap: f32,
+    pub auto_reduce: bool,
 }
 
 // 描述节点自身行为的flex布局属性
@@ -329,6 +332,9 @@ impl Default for FlexContainer {
             align_content: AlignContent::FlexStart,
             direction: Default::default(),
 			overflow_wrap: Default::default(),
+            row_gap: 0.0,
+            column_gap: 0.0,
+            auto_reduce: false,
         }
     }
 }
@@ -967,6 +973,7 @@ impl Show {
     pub fn set_display(&mut self, display: Display) {
         match display {
             Display::Flex => self.0 &= !(ShowType::Display as usize),
+            Display::Grid => self.0 &= !(ShowType::Display as usize),
             Display::None => self.0 |= ShowType::Display as usize,
         }
     }
@@ -1138,6 +1145,10 @@ pub enum StyleType {
 	TransitionDelay = 95,
 
     TextOuterGlow = 96,
+
+    RowGap = 97,
+    ColumnGap = 98,
+    AutoReduce = 99,
 }
 
 // // 可插值属性
