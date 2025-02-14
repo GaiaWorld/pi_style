@@ -26,11 +26,11 @@ pub use pi_flex_layout::style::OverflowWrap;
 
 pub trait Attr: 'static + Sync + Send {
     /// 获取样式属性类型
-    fn get_type() -> u8
+    fn get_type() -> u16
     where
         Self: Sized;
     /// 获取样式属性索引（对应StyleAttrs的索引）
-    fn get_style_index() -> u8
+    fn get_style_index() -> u16
     where
         Self: Sized;
     /// 样式属性的牛内存大小
@@ -90,7 +90,7 @@ pub struct ClassMeta {
 macro_rules! get_type {
     ($key: expr) => {
         #[inline]
-        fn get_type() -> u8 { $key as u8 }
+        fn get_type() -> u16 { $key as u16 }
     };
 }
 
@@ -121,7 +121,7 @@ macro_rules! write_buffer {
             // );
 
 
-            std::ptr::copy_nonoverlapping(&ty as *const u8, buffer.as_mut_ptr().add(len), ty_size);
+            std::ptr::copy_nonoverlapping(&ty as *const u16 as *const u8, buffer.as_mut_ptr().add(len), ty_size);
 
             std::ptr::copy_nonoverlapping(
                 self as *const Self as usize as *const u8,
@@ -145,7 +145,7 @@ macro_rules! write_reset {
 			
 
             let ty = Self::get_style_index();
-            std::ptr::copy_nonoverlapping(&ty as *const u8, buffer.as_mut_ptr().add(len), ty_size);
+            std::ptr::copy_nonoverlapping(&ty as *const u16 as *const u8, buffer.as_mut_ptr().add(len), ty_size);
             // forget(self)
         }
     };
@@ -157,7 +157,7 @@ macro_rules! impl_style {
         pub struct $struct_name;
 
         impl Attr for $struct_name {
-            fn get_style_index() -> u8 { 0 }
+            fn get_style_index() -> u16 { 0 }
             get_type!(StyleType::PaddingBottom);
             fn size() -> usize { 0 }
             write_buffer!();
@@ -170,7 +170,7 @@ macro_rules! impl_style {
         #[derive(Debug, Serialize, Deserialize, Clone, Deref, DerefMut)]
         pub struct $struct_name(pub $value_ty);
         impl Attr for $struct_name {
-            fn get_style_index() -> u8 { Self::get_type() as u8 }
+            fn get_style_index() -> u16 { Self::get_type() as u16 }
             get_type!(StyleType::$ty);
             size!($value_ty);
             write_buffer!();
@@ -181,8 +181,8 @@ macro_rules! impl_style {
             pub struct[<Reset $struct_name>];
 
             impl Attr for [<Reset $struct_name>] {
-                fn get_style_index() -> u8 {
-                    Self::get_type() as u8 + STYLE_COUNT
+                fn get_style_index() -> u16 {
+                    Self::get_type() as u16 + STYLE_COUNT
                 }
                 fn size() -> usize {
                     0
@@ -194,7 +194,7 @@ macro_rules! impl_style {
     };
 }
 
-pub const STYLE_COUNT: u8 = 127;
+pub const STYLE_COUNT: u16 = 255;
 impl_style!(EmptyType);
 impl_style!(FontStyleType, FontStyle);
 

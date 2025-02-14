@@ -1107,7 +1107,7 @@ fn parse_line_height<'i, 't>(input: &mut Parser<'i, 't>) -> Result<LineHeight, T
     }
 }
 
-fn parse_font_size<'i, 't>(input: &mut Parser<'i, 't>) -> Result<FontSize, TokenParseError<'i>> {
+pub fn parse_font_size<'i, 't>(input: &mut Parser<'i, 't>) -> Result<FontSize, TokenParseError<'i>> {
     let location = input.current_source_location();
     let token = input.next()?;
     match token {
@@ -1118,7 +1118,7 @@ fn parse_font_size<'i, 't>(input: &mut Parser<'i, 't>) -> Result<FontSize, Token
     }
 }
 
-fn parse_text_stroke<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Stroke, TokenParseError<'i>> {
+pub fn parse_text_stroke<'i, 't>(input: &mut Parser<'i, 't>) -> Result<Stroke, TokenParseError<'i>> {
     let location = input.current_source_location();
 	let w: f32 = parse_len(input)?;
     Ok(Stroke {
@@ -1317,7 +1317,7 @@ fn parse_image_repeat<'i, 't>(input: &mut Parser<'i, 't>) -> Result<ImageRepeat,
     Ok(r)
 }
 
-fn parse_color_hex(value: &str) -> Result<CgColor, ()> {
+pub fn parse_color_hex(value: &str) -> Result<CgColor, ()> {
     let value = value.as_bytes();
     match value.len() {
         8 => Ok(rgba(
@@ -2773,7 +2773,7 @@ fn parse_center<'i, 't>(input: &mut Parser<'i, 't>) -> Center {
 	center
 }
 
-fn parse_len<'i, 't>(input: &mut Parser<'i, 't>) -> Result<f32, TokenParseError<'i>> {
+pub fn parse_len<'i, 't>(input: &mut Parser<'i, 't>) -> Result<f32, TokenParseError<'i>> {
     let location = input.current_source_location();
     let token = input.next()?;
     let dimension = match *token {
@@ -2877,7 +2877,7 @@ fn parse_filter1<'i, 't>(buffer: &mut VecDeque<Attribute>, input: &mut Parser<'i
     Ok(())
 }
 
-fn parse_color<'i, 't>(input: &mut Parser<'i, 't>) -> Result<CgColor, TokenParseError<'i>> {
+pub fn parse_color<'i, 't>(input: &mut Parser<'i, 't>) -> Result<CgColor, TokenParseError<'i>> {
     let location = input.current_source_location();
     let token = input.next()?;
     match *token {
@@ -3338,7 +3338,7 @@ pub fn parse_color_keyword(ident: &str) -> Result<CgColor, ()> {
     Ok(color)
 }
 
-fn parse_color_function<'i, 't>(location: SourceLocation, name: CowRcStr<'i>, input: &mut Parser<'i, 't>) -> Result<CgColor, TokenParseError<'i>> {
+pub fn parse_color_function<'i, 't>(location: SourceLocation, name: CowRcStr<'i>, input: &mut Parser<'i, 't>) -> Result<CgColor, TokenParseError<'i>> {
     let (red, green, blue, uses_commas) = match name.as_ref() {
         "rgb" | "rgba" => parse_rgb_components_rgb(input)?,
         // "hsl" | "hsla" => parse_rgb_components_hsl(input)?,
