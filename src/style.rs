@@ -716,14 +716,12 @@ pub struct Stroke {
 // 虚线
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StrokeDasharray {
-    pub start_x: f32,
-    pub start_y: f32,
     pub real: f32,     //	实线部分长度
     pub empty: f32,    //	空白处长度
 }
 impl Default for StrokeDasharray {
     fn default() -> Self {
-        Self { real: 100000000.0, empty: 0.0, start_x: 0.0, start_y: 0.0 }
+        Self { real: 100000000.0, empty: 0.0, }
     }
 }
 
@@ -733,7 +731,7 @@ impl From<&str> for StrokeDasharray {
             .split(',')
             .map(|x| x.parse().unwrap())
             .collect();
-        Self { real: args[0], empty: args[1], start_x: 0.0, start_y: 0.0 }
+        Self { real: args[0], empty: args[1],  }
     }
 }
 
@@ -1012,9 +1010,10 @@ pub enum AsImage {
 	/// 强制缓存为图像
 	Force,
 }
-
+pub const GUI_STYLE_COUNT: u16 =  96;
 // 枚举样式的类型
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[repr(u16)]
 pub enum StyleType {
     BackgroundRepeat = 0,
     FontStyle = 1,
