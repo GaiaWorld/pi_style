@@ -182,7 +182,7 @@ macro_rules! impl_style {
 
             impl Attr for [<Reset $struct_name>] {
                 fn get_style_index() -> u16 {
-                    Self::get_type() as u16 + STYLE_COUNT
+                    Self::get_type() as u16 + STYLE_COUNT_MAX
                 }
                 fn size() -> usize {
                     0
@@ -194,7 +194,7 @@ macro_rules! impl_style {
     };
 }
 
-pub const STYLE_COUNT: u16 = 255;
+pub const STYLE_COUNT_MAX: u16 = 255;
 impl_style!(EmptyType);
 impl_style!(FontStyleType, FontStyle);
 

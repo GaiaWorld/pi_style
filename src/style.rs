@@ -1017,7 +1017,7 @@ pub enum AsImage {
 	/// 强制缓存为图像
 	Force,
 }
-
+pub const GUI_STYLE_COUNT: u16 =  99;
 // 枚举样式的类型
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[repr(u16)]
