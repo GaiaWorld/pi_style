@@ -218,7 +218,7 @@ pub enum AnimationPlayState {
 }
 
 /// 设置 CSS 动画在执行之前和之后如何将样式应用于其目标
-#[derive(Debug, Clone, Serialize, Deserialize, EnumDefault)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AnimationFillMode {
     /// 当动画未执行时，动画将不会将任何样式应用于目标，而是已经赋予给该元素的 CSS 规则来显示该元素。这是默认值
     None,
@@ -228,6 +228,12 @@ pub enum AnimationFillMode {
     Backwards,
     /// 动画将遵循forwards和backwards的规则，从而在两个方向上扩展动画属性
     Both,
+}
+
+impl Default for AnimationFillMode {
+    fn default() -> Self {
+        AnimationFillMode::Forwards
+    }
 }
 
 // 淡入淡出方式
