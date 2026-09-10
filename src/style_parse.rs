@@ -3661,3 +3661,16 @@ fn text_content() {
     }
 }
 
+#[test]
+fn nan_test() {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
+    let s = r#"
+	.c1363885129 {
+		width: NaN%;
+	}"#;
+	
+    if let Ok(r) = parse_class_map_from_string(s, 0) {
+        println!("ret: {:?}", r);
+    }
+}
+
